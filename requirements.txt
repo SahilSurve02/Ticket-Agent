@@ -1,0 +1,30 @@
+# Core Dependencies
+langgraph
+langchain
+langchain-core
+langchain-openai
+langchain-community
+
+# Data Processing
+pydantic
+python-dotenv
+
+# Vector Database & Embeddings
+chromadb
+tiktoken
+
+# Web API
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Monitoring & Logging
+loguru
+
+# Testing
+pytest
+pytest-asyncio
+httpx
+
+# Utilities
+aiofiles
