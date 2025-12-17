@@ -21,3 +21,8 @@ class AgentState(TypedDict):
     
     # 'user_info' would come from the login session (Simulated here)
     user_devices: List[str]
+
+    # KB metadata (not the KB object itself - that's not serializable)
+    kb_used: Optional[bool]  # Whether KB was consulted
+    kb_confidence: Optional[str]  # Confidence level of KB results
+    detected_category: Optional[str]  # Auto-detected issue category

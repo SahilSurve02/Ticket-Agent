@@ -1,0 +1,50 @@
+[
+  {
+    "title": "WiFi Connection Drops Intermittently",
+    "category": "WiFi",
+    "issue_type": "connectivity",
+    "symptoms": ["wifi keeps disconnecting", "internet drops frequently", "unstable connection"],
+    "solution": "1. Update WiFi drivers from Device Manager\n2. Change WiFi channel on router (1, 6, or 11 for 2.4GHz)\n3. Disable power saving for WiFi adapter\n4. Reset network settings: netsh winsock reset\n5. Update router firmware",
+    "severity": "Medium",
+    "related_errors": ["Limited connectivity", "No internet access", "DNS probe failed"],
+    "prerequisites": ["Admin access", "Router access"],
+    "success_rate": 0.85,
+    "estimated_time": "15-30 minutes"
+  },
+  {
+    "title": "Unable to Connect to Corporate WiFi",
+    "category": "WiFi",
+    "issue_type": "authentication",
+    "symptoms": ["can't connect to wifi", "authentication failed", "wrong password error"],
+    "solution": "1. Verify you're using correct credentials (domain\\username)\n2. Forget network and reconnect\n3. Check if account is locked in Active Directory\n4. Ensure device is domain-joined\n5. Update security certificates",
+    "severity": "High",
+    "related_errors": ["Authentication failed", "Invalid credentials", "Certificate error"],
+    "prerequisites": ["Valid domain account", "Device compliance"],
+    "success_rate": 0.90,
+    "estimated_time": "10-20 minutes"
+  },
+  {
+    "title": "Login Failed - Account Locked",
+    "category": "Login",
+    "issue_type": "account_locked",
+    "symptoms": ["account is locked", "too many failed attempts", "can't login"],
+    "solution": "1. Wait 30 minutes for automatic unlock\n2. OR call IT helpdesk for immediate unlock\n3. Reset password if forgotten\n4. Enable MFA if not already active\n5. Check for suspicious login attempts",
+    "severity": "High",
+    "related_errors": ["Account locked out", "Too many failed login attempts"],
+    "prerequisites": ["User identity verification"],
+    "success_rate": 0.95,
+    "estimated_time": "5-10 minutes"
+  },
+  {
+    "title": "Slow Computer Performance",
+    "category": "Hardware",
+    "issue_type": "performance",
+    "symptoms": ["computer is slow", "lagging", "freezing", "programs not responding"],
+    "solution": "1. Check Task Manager for high CPU/memory usage\n2. Close unnecessary programs\n3. Run disk cleanup\n4. Check for malware with Windows Defender\n5. Defragment hard drive (for HDD only)\n6. Add more RAM if consistently at 90%+",
+    "severity": "Medium",
+    "related_errors": ["Not responding", "High memory usage"],
+    "prerequisites": ["Admin access"],
+    "success_rate": 0.75,
+    "estimated_time": "20-40 minutes"
+  }
+]

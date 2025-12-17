@@ -2,6 +2,7 @@ from langgraph.graph import StateGraph, END, START
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from src.state import AgentState, TicketSchema
 from src.nodes import chatbot_node, ticket_agent_node
+from src.kb import initialize_kb_with_check
 from langgraph.checkpoint.memory import MemorySaver
 import uuid
 from langchain_core.messages import HumanMessage
@@ -79,8 +80,16 @@ app = workflow.compile(checkpointer=memory)
 
 
 def run_chat():
-    # 1. Create a simplified initial state
-    # We mock 'user_devices' as if they came from a database login
+    # Initialize KB once at startup and set it globally
+    from src.kb import set_global_kb
+    kb = initialize_kb_with_check("./chroma_db")
+    set_global_kb(kb)  # Store in global variable, not in state
+    
+    if not kb:
+        print("Warning: Running without knowledge base")
+    else:
+        print("Knowledge base initialized successfully")
+    
     initial_input = {
         "user_devices": ["Dell Latitude 5420", "iPad Pro"],
         "ticket": {"issue_summary": None, "is_complete": False}
@@ -124,6 +133,7 @@ def run_chat():
                 # Optional: Print ticket updates if they happen
                 if "ticket" in state_update:
                     print(f"   (Ticket State Updated: {state_update['ticket']})")
+
 
 if __name__ == "__main__":
     # Ensure you are using a Checkpointer so state is remembered!

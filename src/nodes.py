@@ -7,6 +7,13 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
+
+# Mock KB for "First Line of Defense" 
+KB_ANSWERS = {
+    "wifi": "1. Toggle Wifi on/off.\n2. Forget network 'SchoolWifi'.\n3. Restart device.",
+    "login": "1. Clear browser cache.\n2. Try Incognito mode.\n3. Reset password."
+}
+
 # Initialize LLM
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
@@ -14,17 +21,64 @@ llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 def chatbot_node(state: AgentState):
     messages = state["messages"]
     
-    # Logic: simple heuristic or LLM decision to check if issue is resolved
-    # For this demo, we ask the LLM to decide if it should route to ticket filing.
+    # Get KB from global scope (not from state, as it's not serializable)
+    from src.kb import get_global_kb, get_best_solution, detect_category
+    kb = get_global_kb()
     
-    system_prompt = """
-    You are an IT Support Chatbot.
-    1. specific Troubleshooting steps for: Wifi, Login, Hardware.
-    2. If the user says "it didn't work" or asks for a ticket, reply with "handoff_to_ticket".
-    3. Otherwise, be helpful and brief.
-    """
+    # Extract user's issue from latest message
+    user_message = messages[-1].content if messages else ""
     
-    # We allow the LLM to just reply normally
+    # If KB is available, try to get relevant solutions
+    kb_results = {"found": False, "solutions": []}
+    if kb:
+        try:
+            category = detect_category(user_message)
+            kb_results = get_best_solution(
+                kb=kb,
+                issue_description=user_message,
+                conversation_history=[m.content for m in messages[:-1]],
+                category=category
+            )
+        except Exception as e:
+            # Fallback gracefully if KB fails
+            print(f"Warning: KB search failed: {e}")
+    
+    # Build system prompt with or without KB context
+    if kb_results["found"] and kb_results["confidence"] in ["high", "medium"]:
+        # Format KB solutions for LLM
+        kb_context = "\n\n".join([
+            f"**Solution {i+1}** (Similarity: {sol['similarity']:.2%}):\n{sol['content']}"
+            for i, sol in enumerate(kb_results["solutions"])
+        ])
+        
+        system_prompt = f"""
+        You are an IT Support Chatbot. 
+
+        INSTRUCTIONS:
+        1. Provide troubleshooting steps from the knowledge base and if don't get any relevant information from the knowledge base, let the user know you couldn't find anything useful.
+        2. Keep responses concise - just the numbered steps and a little bit of explanation if needed and nothing distant from the original point.
+        3. If user says "it didn't work", ask: "Would you like me to create a support ticket for this issue?"
+        4. ONLY reply with "handoff_to_ticket" if user explicitly confirms they want a ticket (says yes, confirm, etc)
+        5. If user says no, continue helping
+
+        Do NOT automatically offer tickets. Only when user indicates solution didn't work.
+        """
+    else:
+        # Fallback to generic prompt
+        system_prompt = f"""
+        You are an IT Support Chatbot. 
+
+        INSTRUCTIONS:
+        1. Provide troubleshooting steps from the knowledge base and if don't get any relevant information from the knowledge base, let the user know you couldn't find anything useful.
+        2. Keep responses concise - just the numbered steps and a little bit of explanation if needed and nothing distant from the original point.
+        3. If user says "it didn't work", ask: "Would you like me to create a support ticket for this issue?"
+        4. ONLY reply with "handoff_to_ticket" if user explicitly confirms they want a ticket (says yes, confirm, etc)
+        5. If user says no, continue helping
+
+        Do NOT automatically offer tickets. Only when user indicates solution didn't work.
+        """
+    
+    # Invoke LLM
     response = llm.invoke([SystemMessage(content=system_prompt)] + messages)
     
     return {"messages": [response]}
