@@ -1,7 +1,7 @@
 from langgraph.graph import StateGraph, END, START
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from src.state import AgentState, TicketSchema
-from src.nodes import chatbot_node, ticket_agent_node
+from src.nodes import chatbot_node, ticket_collection_node, ticket_confirmation_node, ticket_preview_node
 from src.kb import initialize_kb_with_check
 from langgraph.checkpoint.memory import MemorySaver
 import uuid
@@ -21,57 +21,123 @@ llm = ChatOpenAI(
 # 1. Define the Router Logic
 def route_chatbot(state: AgentState):
     """
-    Decides if we stay in Chatbot mode or move to Ticket Agent.
+    Routes from chatbot to ticket collection or stays in chat
     """
+    
+    # Check if user is in confirmation phase (preview was shown, waiting for submit/edit/cancel)
+    if state.get("awaiting_confirmation"):
+        return "ticket_confirmation"
+    
+    # Check if we have an incomplete ticket (user is in middle of filing)
+    ticket = state.get("ticket", {})
+    if isinstance(ticket, dict):
+        has_fields = ticket.get("issue_summary") or ticket.get("device_id") or ticket.get("priority")
+        has_summary = ticket.get("issue_summary") is not None
+        has_device = ticket.get("device_id") is not None
+        has_priority = ticket.get("priority") is not None
+        is_complete = has_summary and has_device and has_priority
+        
+        if has_fields and not is_complete:
+            # User is in middle of ticket flow, route back to collection
+            return "ticket_collection"
+    
     last_msg = state["messages"][-1]
     
-    # If the chatbot said the magic word "handoff_to_ticket" (or you can use a structured flag)
     if "handoff_to_ticket" in last_msg.content:
-        return "ticket_agent"
-    return END # Or wait for user input
+        return "ticket_collection"
+    return END
 
-def route_ticket(state: AgentState):
+def route_ticket_collection(state: AgentState):
     """
-    Loops the ticket agent until the form is complete.
+    Routes from ticket collection phase
     """
-    ticket = state["ticket"]
-    # Handle both dict and TicketSchema instances
-    is_complete = ticket.get("is_complete") if isinstance(ticket, dict) else ticket.is_complete
+    current_ticket = state["ticket"]
+    if isinstance(current_ticket, dict):
+        current_ticket = TicketSchema(**current_ticket)
     
-    if is_complete:
+    # Check if all required fields are collected
+    has_summary = current_ticket.issue_summary is not None
+    has_device = current_ticket.device_id is not None
+    has_priority = current_ticket.priority is not None
+    
+    if has_summary and has_device and has_priority:
+        return "ticket_preview"
+    else:
+        return END  # Wait for user to respond with next field
+    
+def route_confirmation(state: AgentState):
+    """
+    Routes from confirmation node based on user's choice
+    """
+    confirmation_action = state.get("confirmation_action", "")
+    
+    if confirmation_action == "submit":
         return "submit_ticket"
-    return "continue_filling" # Loop back to ticket_agent
+    elif confirmation_action == "edit":
+        return "ticket_collection"  # Go back to edit
+    elif confirmation_action == "cancel":
+        return "chatbot"  # Return to chatbot
+    else:
+        return "await_response"  # Stay in confirmation, waiting for valid response
 
 # 2. Build the Graph
 workflow = StateGraph(AgentState)
 
 # Add Nodes
 workflow.add_node("chatbot", chatbot_node)
-workflow.add_node("ticket_agent", ticket_agent_node)
-workflow.add_node("submit_ticket", lambda state: {"messages": [AIMessage(content="Ticket #1234 Created!")]})
-
+workflow.add_node("ticket_collection", ticket_collection_node)
+workflow.add_node("ticket_preview",ticket_preview_node)
+workflow.add_node("ticket_confirmation", ticket_confirmation_node)
+workflow.add_node("submit_ticket", lambda state: {
+    "messages": [AIMessage(content="✅ Ticket #" + str(uuid.uuid4())[:8] + " created successfully!\n\nIs there anything else I can help you with?")]
+})
 # Set Entry Point
 workflow.set_entry_point("chatbot")
 
 # Add Edges
-# From Chatbot -> User Input OR Ticket Agent
+# 1. From chatbot
 workflow.add_conditional_edges(
     "chatbot",
     route_chatbot,
     {
-        "ticket_agent": "ticket_agent",
+        "ticket_collection": "ticket_collection",
+        "ticket_confirmation": "ticket_confirmation",  # Route to confirmation when awaiting response
         END: END
     }
 )
 
-# From Ticket Agent -> Loop OR Submit
+# 2. From ticket_collection
 workflow.add_conditional_edges(
-    "ticket_agent", 
-    route_ticket,
+    "ticket_collection", 
+    route_ticket_collection,
     {
-        "continue_filling": "ticket_agent", # The Loop
-        "submit_ticket": "submit_ticket"
+        "ticket_preview": "ticket_preview",
+        END: END  # Wait for user response instead of looping
     }
+)
+
+# 3. From ticket_preview -> always go to confirmation
+workflow.add_edge(
+    "ticket_preview",
+    "ticket_confirmation"
+)
+
+# 4. From ticket_confirmation
+workflow.add_conditional_edges(
+    "ticket_confirmation",
+    route_confirmation,
+    {
+        "submit_ticket": "submit_ticket",
+        "ticket_collection": "ticket_collection",  # Edit
+        "chatbot": "chatbot",  # Cancel
+        "await_response": "ticket_confirmation"  # Invalid response, loop
+    }
+)
+
+# 5. From submit_ticket -> back to chatbot for new conversation
+workflow.add_edge(
+    "submit_ticket", 
+    "chatbot"
 )
 
 # # Compile
@@ -92,7 +158,15 @@ def run_chat():
     
     initial_input = {
         "user_devices": ["Dell Latitude 5420", "iPad Pro"],
-        "ticket": {"issue_summary": None, "is_complete": False}
+        "ticket": {
+            "issue_summary": None, 
+            "device_id": None,
+            "priority": None,
+            "description": None
+        },
+        "ticket_preview_shown": False,
+        "awaiting_confirmation": False,
+        "last_question": None
     }
     
     # 2. Config for the conversation thread (required by LangGraph to track state)
@@ -125,14 +199,18 @@ def run_chat():
         for event in app.stream(input_message, config=config):
             for node_name, state_update in event.items():
                 
+                # Skip if state_update is None or empty
+                if not state_update:
+                    continue
+                
                 # Check if this node produced a new AI message
                 if "messages" in state_update and state_update["messages"]:
                     last_msg = state_update["messages"][-1]
                     print(f"\n[{node_name}]: {last_msg.content}")
                 
-                # Optional: Print ticket updates if they happen
-                if "ticket" in state_update:
-                    print(f"   (Ticket State Updated: {state_update['ticket']})")
+                # Debug: Uncomment to see ticket updates during development
+                # if "ticket" in state_update:
+                #     print(f"   (Ticket State Updated: {state_update['ticket']})")
 
 
 if __name__ == "__main__":
