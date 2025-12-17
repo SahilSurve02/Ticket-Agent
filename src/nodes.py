@@ -21,15 +21,18 @@ llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 def chatbot_node(state: AgentState):
     messages = state["messages"]
     
-    # CHECK: If we're in ticket collection mode, skip chatbot processing
-    # Let the routing send user directly to ticket_collection
-    ticket = state.get("ticket", {})
+    # CHECK: If we're in ticket collection mode or awaiting confirmation, skip chatbot processing
     last_question = state.get("last_question", None)
+    awaiting_confirmation = state.get("awaiting_confirmation", False)
     
     # If we just asked a ticket question and user is responding, don't process in chatbot
     if last_question in ["device", "priority", "description"]:
         # User is responding to ticket collection question
         # Don't call LLM, just pass through (routing will handle it)
+        return {}
+    
+    # If awaiting confirmation (preview shown), don't process in chatbot
+    if awaiting_confirmation:
         return {}
     
     # Get KB from global scope (not from state, as it's not serializable)
@@ -40,7 +43,7 @@ def chatbot_node(state: AgentState):
     user_message = messages[-1].content if messages else ""
     
     # If KB is available, try to get relevant solutions
-    kb_results = {"found": False, "solutions": []}
+    kb_results = {"found": False, "solutions": [], "confidence": "low"}
     if kb:
         try:
             category = detect_category(user_message)
@@ -50,6 +53,11 @@ def chatbot_node(state: AgentState):
                 conversation_history=[m.content for m in messages[:-1]],
                 category=category
             )
+            # Debug: Show KB search results
+            print(f"[DEBUG] KB search for: '{user_message}', category: {category}")
+            print(f"[DEBUG] KB results: found={kb_results['found']}, confidence={kb_results.get('confidence', 'N/A')}")
+            if kb_results.get('solutions'):
+                print(f"[DEBUG] Top solution similarity: {kb_results['solutions'][0].get('similarity', 'N/A')}")
         except Exception as e:
             # Fallback gracefully if KB fails
             print(f"Warning: KB search failed: {e}")
@@ -97,13 +105,28 @@ def chatbot_node(state: AgentState):
         You are an IT Support Chatbot. 
 
         INSTRUCTIONS:
-        1. Provide troubleshooting steps from the knowledge base and if don't get any relevant information from the knowledge base, let the user know you couldn't find anything useful.
-        2. Keep responses concise - just the numbered steps and a little bit of explanation if needed and nothing distant from the original point.
-        3. If user says "it didn't work", ask: "Would you like me to create a support ticket for this issue?"
-        4. ONLY reply with "handoff_to_ticket" if user explicitly confirms they want a ticket (says yes, confirm, etc)
-        5. If user says no, continue helping
+        1. If KB solution found: Provide ONLY the steps from the knowledge base, nothing more.
+        - Copy the numbered steps exactly
+        - Add a brief "Try these steps" intro
+        - Do NOT elaborate or add extra explanations
 
-        Do NOT automatically offer tickets. Only when user indicates solution didn't work.
+        2. If NO KB solution found: Say "I couldn't find a specific solution, but here are general steps:" 
+        Then provide 3-4 basic troubleshooting steps only.
+
+        3. After providing steps, ask: "Let me know if this helps!"
+
+        4. If user says "didn't work", "still not working", "issue persists":
+        Ask: "Would you like me to create a support ticket for this issue? (yes/no)"
+
+        5. If user replies "yes", "sure", "please", "ok" to ticket question:
+        Reply ONLY with: "handoff_to_ticket"
+
+        6. If user says "no": 
+        Ask what else you can help with.
+
+        7. NEVER mention tickets unless user indicates solution didn't work.
+
+        Keep all responses SHORT and DIRECT.
         """
     
     # Invoke LLM
@@ -255,48 +278,41 @@ IMPORTANT: Use TicketSchema tool to update ONLY the issue_summary field. Do NOT 
     
     # Check if device is missing
     if not current_ticket.device_id:
-        ask_prompt = f"""Ask the user which device they're having issues with.
-
-USER DEVICES:
-{chr(10).join([f"- {device}" for device in user_devices])}
-
-Say: "Which device are you experiencing this issue with?" and list the devices clearly.
-"""
-        response = llm.invoke([SystemMessage(content=ask_prompt)] + messages)
+        # Use fixed message instead of LLM to avoid weird responses
+        device_list = "\n".join([f"  • {device}" for device in user_devices])
+        ask_message = f"Which device are you experiencing this issue with?\n\n{device_list}"
+        
         return {
-            "messages": [response],
+            "messages": [AIMessage(content=ask_message)],
             "ticket": current_ticket,
             "last_question": "device"  # Track that we asked for device
         }
     
     # Check if priority is missing
     if not current_ticket.priority:
-        ask_prompt = """Ask user for priority level.
+        # Use fixed message
+        ask_message = """What priority level should this ticket have?
 
-Say: "What priority level should this ticket have?
-- Low: Can wait, minor inconvenience
-- Medium: Affecting work but have workaround  
-- High: Blocking work, urgent
-- Critical: System down, business impact
+  • **Low:** Can wait, minor inconvenience
+  • **Medium:** Affecting work but have workaround  
+  • **High:** Blocking work, urgent
+  • **Critical:** System down, business impact
 
-Please choose: Low, Medium, High, or Critical"
-"""
-        response = llm.invoke([SystemMessage(content=ask_prompt)] + messages)
+Please choose: Low, Medium, High, or Critical"""
+        
         return {
-            "messages": [response],
+            "messages": [AIMessage(content=ask_message)],
             "ticket": current_ticket,
             "last_question": "priority"  # Track that we asked for priority
         }
     
     # Check if description is missing (optional field)
     if not current_ticket.description:
-        ask_prompt = """Ask if user wants to add details.
-
-Say: "Would you like to add any additional details or description to the ticket? (You can say 'no' or 'skip' if not)"
-"""
-        response = llm.invoke([SystemMessage(content=ask_prompt)] + messages)
+        # Use fixed message
+        ask_message = "Would you like to add any additional details or description to the ticket? (You can say 'no' to skip)"
+        
         return {
-            "messages": [response],
+            "messages": [AIMessage(content=ask_message)],
             "ticket": current_ticket,
             "last_question": "description"  # Track that we asked for description
         }
@@ -386,8 +402,9 @@ def ticket_confirmation_node(state: AgentState):
         }
     
     else:
-        # User's response unclear - stay in confirmation
+        # User's response unclear - stay in confirmation mode
         return {
             "messages": [AIMessage(content="Please respond with: submit, edit, or cancel")],
-            "confirmation_action": ""
+            "confirmation_action": "",
+            "awaiting_confirmation": True  # Keep in confirmation mode
         }

@@ -101,7 +101,7 @@ def search_knowledge(
     query: str,
     category: Optional[str] = None,
     top_k: int = 3,
-    min_similarity: float = 0.7
+    min_similarity: float = 0.5
 ) -> List[Dict]:
     """
     Search knowledge base with semantic similarity
@@ -131,8 +131,14 @@ def search_knowledge(
     # Filter by minimum similarity and format results
     formatted_results = []
     for doc, score in results:
-        # ChromaDB returns distance (lower is better), convert to similarity
-        similarity = 1 - score
+        # ChromaDB returns L2 distance by default
+        # For OpenAI embeddings (normalized), cosine similarity = 1 - (distance^2 / 2)
+        # But in practice, we can use: similarity = 1 / (1 + score) for a 0-1 range
+        # Or simply: similarity = max(0, 1 - score) capped at 0
+        similarity = max(0, 1 - score)  # Simple conversion, works for normalized embeddings
+        
+        # Debug: print score info
+        # print(f"[DEBUG] KB result: score={score:.4f}, similarity={similarity:.4f}, content preview: {doc.page_content[:50]}...")
         
         if similarity >= min_similarity:
             formatted_results.append({
@@ -164,7 +170,7 @@ def get_best_solution(
     # Strategy 1: Direct semantic search
     results = search_knowledge(kb, issue_description, category, top_k=3)
     
-    if results and results[0]["similarity"] >= 0.85:
+    if results and results[0]["similarity"] >= 0.7:
         return {
             "found": True,
             "solutions": results,
@@ -178,7 +184,7 @@ def get_best_solution(
         enhanced_query = f"{issue_description} {context}"
         results = search_knowledge(kb, enhanced_query, category, top_k=5)
         
-        if results and results[0]["similarity"] >= 0.75:
+        if results and results[0]["similarity"] >= 0.6:
             return {
                 "found": True,
                 "solutions": results[:3],
@@ -190,7 +196,7 @@ def get_best_solution(
     if category:
         results = search_knowledge(kb, issue_description, category=None, top_k=5)
         
-        if results and results[0]["similarity"] >= 0.65:
+        if results and results[0]["similarity"] >= 0.5:
             return {
                 "found": True,
                 "solutions": results[:3],
@@ -206,72 +212,72 @@ def get_best_solution(
         "fallback_used": True
     }
 
-def chatbot_node_with_rag(state: AgentState):
-    """Enhanced chatbot with knowledge base integration"""
-    messages = state["messages"]
-    kb = state.get("knowledge_base")  # Add to state
+# def chatbot_node_with_rag(state: AgentState):
+#     """Enhanced chatbot with knowledge base integration"""
+#     messages = state["messages"]
+#     kb = state.get("knowledge_base")  # Add to state
     
-    # Extract user's issue from latest message
-    user_message = messages[-1].content if messages else ""
+#     # Extract user's issue from latest message
+#     user_message = messages[-1].content if messages else ""
     
-    # Detect category from conversation
-    category = detect_category(user_message)  # Helper function
+#     # Detect category from conversation
+#     category = detect_category(user_message)  # Helper function
     
-    # Search knowledge base
-    if kb:
-        kb_results = get_best_solution(
-            kb=kb,
-            issue_description=user_message,
-            conversation_history=[m.content for m in messages[:-1]],
-            category=category
-        )
-    else:
-        kb_results = {"found": False, "solutions": []}
+#     # Search knowledge base
+#     if kb:
+#         kb_results = get_best_solution(
+#             kb=kb,
+#             issue_description=user_message,
+#             conversation_history=[m.content for m in messages[:-1]],
+#             category=category
+#         )
+#     else:
+#         kb_results = {"found": False, "solutions": []}
     
-    # Build enhanced system prompt with RAG context
-    if kb_results["found"] and kb_results["confidence"] in ["high", "medium"]:
-        # Format KB solutions for LLM
-        kb_context = "\n\n".join([
-            f"**Solution {i+1}** (Similarity: {sol['similarity']:.2%}):\n{sol['content']}"
-            for i, sol in enumerate(kb_results["solutions"])
-        ])
+#     # Build enhanced system prompt with RAG context
+#     if kb_results["found"] and kb_results["confidence"] in ["high", "medium"]:
+#         # Format KB solutions for LLM
+#         kb_context = "\n\n".join([
+#             f"**Solution {i+1}** (Similarity: {sol['similarity']:.2%}):\n{sol['content']}"
+#             for i, sol in enumerate(kb_results["solutions"])
+#         ])
         
-        system_prompt = f"""
-        You are an IT Support Chatbot with access to a knowledge base.
+#         system_prompt = f"""
+#         You are an IT Support Chatbot with access to a knowledge base.
         
-        RELEVANT SOLUTIONS FROM KNOWLEDGE BASE:
-        {kb_context}
+#         RELEVANT SOLUTIONS FROM KNOWLEDGE BASE:
+#         {kb_context}
         
-        INSTRUCTIONS:
-        1. Use the provided solutions as a reference
-        2. Adapt the steps to the user's specific situation
-        3. Be conversational and empathetic
-        4. If the user confirms the issue is resolved, thank them
-        5. If the user says "it didn't work" or requests a ticket, reply with "handoff_to_ticket"
-        6. Ask clarifying questions if needed
+#         INSTRUCTIONS:
+#         1. Use the provided solutions as a reference
+#         2. Adapt the steps to the user's specific situation
+#         3. Be conversational and empathetic
+#         4. If the user confirms the issue is resolved, thank them
+#         5. If the user says "it didn't work" or requests a ticket, reply with "handoff_to_ticket"
+#         6. Ask clarifying questions if needed
         
-        Keep responses concise and actionable.
-        """
-    else:
-        # Fallback to generic prompt
-        system_prompt = """
-        You are an IT Support Chatbot.
-        1. Provide general troubleshooting steps for: WiFi, Login, Hardware issues
-        2. If the user says "it didn't work" or asks for a ticket, reply with "handoff_to_ticket"
-        3. Be helpful and ask clarifying questions
+#         Keep responses concise and actionable.
+#         """
+#     else:
+#         # Fallback to generic prompt
+#         system_prompt = """
+#         You are an IT Support Chatbot.
+#         1. Provide general troubleshooting steps for: WiFi, Login, Hardware issues
+#         2. If the user says "it didn't work" or asks for a ticket, reply with "handoff_to_ticket"
+#         3. Be helpful and ask clarifying questions
         
-        Note: I couldn't find a specific solution in the knowledge base, so provide general advice.
-        """
+#         Note: I couldn't find a specific solution in the knowledge base, so provide general advice.
+#         """
     
-    # Invoke LLM with enhanced context
-    response = llm.invoke([SystemMessage(content=system_prompt)] + messages)
+#     # Invoke LLM with enhanced context
+#     response = llm.invoke([SystemMessage(content=system_prompt)] + messages)
     
-    # Update state with KB metadata
-    return {
-        "messages": [response],
-        "kb_used": kb_results["found"],
-        "kb_confidence": kb_results.get("confidence", "none")
-    }
+#     # Update state with KB metadata
+#     return {
+#         "messages": [response],
+#         "kb_used": kb_results["found"],
+#         "kb_confidence": kb_results.get("confidence", "none")
+#     }
 
 def detect_category(message: str) -> Optional[str]:
     """Detect issue category from user message"""

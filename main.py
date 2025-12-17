@@ -28,17 +28,21 @@ def route_chatbot(state: AgentState):
     if state.get("awaiting_confirmation"):
         return "ticket_confirmation"
     
+    # Check if we just asked a ticket question - route to ticket_collection
+    last_question = state.get("last_question", None)
+    if last_question in ["device", "priority", "description"]:
+        return "ticket_collection"
+    
     # Check if we have an incomplete ticket (user is in middle of filing)
     ticket = state.get("ticket", {})
     if isinstance(ticket, dict):
-        has_fields = ticket.get("issue_summary") or ticket.get("device_id") or ticket.get("priority")
         has_summary = ticket.get("issue_summary") is not None
         has_device = ticket.get("device_id") is not None
         has_priority = ticket.get("priority") is not None
-        is_complete = has_summary and has_device and has_priority
+        has_description = ticket.get("description") is not None
         
-        if has_fields and not is_complete:
-            # User is in middle of ticket flow, route back to collection
+        # If we have some fields but not all required ones
+        if has_summary and not (has_device and has_priority and has_description):
             return "ticket_collection"
     
     last_msg = state["messages"][-1]
@@ -55,12 +59,13 @@ def route_ticket_collection(state: AgentState):
     if isinstance(current_ticket, dict):
         current_ticket = TicketSchema(**current_ticket)
     
-    # Check if all required fields are collected
+    # Check if ALL required fields are collected (including description)
     has_summary = current_ticket.issue_summary is not None
     has_device = current_ticket.device_id is not None
     has_priority = current_ticket.priority is not None
+    has_description = current_ticket.description is not None
     
-    if has_summary and has_device and has_priority:
+    if has_summary and has_device and has_priority and has_description:
         return "ticket_preview"
     else:
         return END  # Wait for user to respond with next field
@@ -78,7 +83,7 @@ def route_confirmation(state: AgentState):
     elif confirmation_action == "cancel":
         return "chatbot"  # Return to chatbot
     else:
-        return "await_response"  # Stay in confirmation, waiting for valid response
+        return END  # Invalid response, wait for valid input
 
 # 2. Build the Graph
 workflow = StateGraph(AgentState)
@@ -89,7 +94,16 @@ workflow.add_node("ticket_collection", ticket_collection_node)
 workflow.add_node("ticket_preview",ticket_preview_node)
 workflow.add_node("ticket_confirmation", ticket_confirmation_node)
 workflow.add_node("submit_ticket", lambda state: {
-    "messages": [AIMessage(content="✅ Ticket #" + str(uuid.uuid4())[:8] + " created successfully!\n\nIs there anything else I can help you with?")]
+    "messages": [AIMessage(content="✅ Ticket #" + str(uuid.uuid4())[:8] + " created successfully!\n\nIs there anything else I can help you with?")],
+    "ticket": {
+        "issue_summary": None,
+        "device_id": None,
+        "priority": None,
+        "description": None
+    },
+    "ticket_preview_shown": False,
+    "awaiting_confirmation": False,
+    "last_question": None
 })
 # Set Entry Point
 workflow.set_entry_point("chatbot")
@@ -116,10 +130,11 @@ workflow.add_conditional_edges(
     }
 )
 
-# 3. From ticket_preview -> always go to confirmation
+# 3. From ticket_preview -> END (wait for user to submit/edit/cancel)
+# User's response will go to chatbot, which routes to ticket_confirmation
 workflow.add_edge(
     "ticket_preview",
-    "ticket_confirmation"
+    END
 )
 
 # 4. From ticket_confirmation
@@ -130,14 +145,14 @@ workflow.add_conditional_edges(
         "submit_ticket": "submit_ticket",
         "ticket_collection": "ticket_collection",  # Edit
         "chatbot": "chatbot",  # Cancel
-        "await_response": "ticket_confirmation"  # Invalid response, loop
+        END: END  # Invalid response, wait for valid input
     }
 )
 
-# 5. From submit_ticket -> back to chatbot for new conversation
+# 5. From submit_ticket -> END (ticket complete, wait for next user input)
 workflow.add_edge(
     "submit_ticket", 
-    "chatbot"
+    END
 )
 
 # # Compile

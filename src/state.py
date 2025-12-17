@@ -29,3 +29,4 @@ class AgentState(TypedDict):
     ticket_preview_shown: Optional[bool]  # Track if preview was shown
     awaiting_confirmation: Optional[bool]  # Waiting for user to confirm ticket
     last_question: Optional[str]  # Track what question we just asked (device/priority/description)
+    confirmation_action: Optional[str]  # The action from confirmation: submit, edit, cancel
