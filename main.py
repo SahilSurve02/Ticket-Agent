@@ -31,12 +31,17 @@ def route_chatbot(state: AgentState):
     if last_question in ticket_questions:
         return "ticket_collection"
     
-    # Check last message for handoff trigger
+    # Check last message for agent handoff trigger
     messages = state.get("messages", [])
     if messages:
         last_msg = messages[-1]
-        if hasattr(last_msg, 'content') and "handoff_to_ticket" in last_msg.content:
-            return "ticket_collection"
+        if hasattr(last_msg, 'content'):
+            # Check for agent handoff signal
+            if "HANDOFF_TO_TICKET_AGENT" in last_msg.content:
+                return "ticket_collection"
+            # Legacy handoff (for backwards compatibility)
+            if "handoff_to_ticket" in last_msg.content:
+                return "ticket_collection"
     
     return END
 
@@ -161,7 +166,7 @@ def run_chat():
     # Initial state
     initial_input = {
         "user_info": user_info,
-        "user_devices": ["Dell Latitude 5420", "iPad Pro", "iPhone 14"],
+        "user_devices": ["Dell Latitude 5420", "iPad Pro", "iPhone 14", "MacBook Pro"],
         "ticket": create_empty_ticket(),
         "ticket_preview_shown": False,
         "awaiting_confirmation": False,
@@ -212,9 +217,10 @@ def run_chat():
                     
                     if "messages" in state_update and state_update["messages"]:
                         last_msg = state_update["messages"][-1]
-                        # Don't print "handoff_to_ticket" to user
-                        if "handoff_to_ticket" not in last_msg.content:
-                            print(f"\nBot: {last_msg.content}")
+                        # Don't print agent handoff signals to user
+                        content = last_msg.content
+                        if "HANDOFF_TO_TICKET_AGENT" not in content and "handoff_to_ticket" not in content:
+                            print(f"\nBot: {content}")
         
         except Exception as e:
             print(f"\n[Error]: {e}")

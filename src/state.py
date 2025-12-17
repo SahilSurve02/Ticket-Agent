@@ -139,3 +139,7 @@ class AgentState(TypedDict):
     
     # Category-specific form tracking
     current_extra_field_index: Optional[int]  # Which extra field we're currently asking about
+    
+    # Multi-agent tracking
+    current_agent: Optional[str]  # "chatbot" or "ticket"
+    ticket_collection_complete: Optional[bool]  # Flag when all ticket fields collected
