@@ -87,7 +87,7 @@
     "title": "Slow Computer Performance",
     "category": "Hardware",
     "issue_type": "performance",
-    "symptoms": ["computer is slow", "laptop slow", "device slow", "lagging", "freezing", "programs not responding", "slow performance", "running slow", "very slow", "performing slow", "device performing tasks very slow", "tasks very slow"],
+    "symptoms": ["Laptop working slow","computer is slow", "laptop slow", "device slow", "lagging", "freezing", "programs not responding", "slow performance", "running slow", "very slow", "performing slow", "device performing tasks very slow", "tasks very slow"],
     "solution": "1. Check Task Manager for high CPU/memory usage (Ctrl+Shift+Esc)\n2. Close unnecessary programs and browser tabs\n3. Run Disk Cleanup (search 'Disk Cleanup' in Start)\n4. Check for malware with Windows Defender full scan\n5. Disable startup programs (Task Manager > Startup tab)\n6. Restart computer if not done recently",
     "severity": "Medium",
     "related_errors": ["Not responding", "High memory usage", "Disk at 100%"],

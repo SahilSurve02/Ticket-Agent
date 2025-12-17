@@ -131,14 +131,15 @@ def search_knowledge(
     # Filter by minimum similarity and format results
     formatted_results = []
     for doc, score in results:
-        # ChromaDB returns L2 distance by default
-        # For OpenAI embeddings (normalized), cosine similarity = 1 - (distance^2 / 2)
-        # But in practice, we can use: similarity = 1 / (1 + score) for a 0-1 range
-        # Or simply: similarity = max(0, 1 - score) capped at 0
-        similarity = max(0, 1 - score)  # Simple conversion, works for normalized embeddings
+        # ChromaDB with langchain returns L2 distance
+        # Lower score = more similar. Score of 0 = identical, Score > 1 = less similar
+        # Convert to similarity: use exponential decay for better distribution
+        # similarity = exp(-score) gives us 1.0 for score=0, ~0.37 for score=1
+        import math
+        similarity = math.exp(-score)
         
         # Debug: print score info
-        # print(f"[DEBUG] KB result: score={score:.4f}, similarity={similarity:.4f}, content preview: {doc.page_content[:50]}...")
+        print(f"[DEBUG] KB result: L2_dist={score:.4f}, similarity={similarity:.4f}")
         
         if similarity >= min_similarity:
             formatted_results.append({
@@ -167,10 +168,10 @@ def get_best_solution(
             "fallback_used": bool
         }
     """
-    # Strategy 1: Direct semantic search
-    results = search_knowledge(kb, issue_description, category, top_k=3)
+    # Strategy 1: Direct semantic search (with category if available)
+    results = search_knowledge(kb, issue_description, category, top_k=3, min_similarity=0.3)
     
-    if results and results[0]["similarity"] >= 0.7:
+    if results and results[0]["similarity"] >= 0.5:
         return {
             "found": True,
             "solutions": results,
@@ -178,13 +179,25 @@ def get_best_solution(
             "fallback_used": False
         }
     
-    # Strategy 2: Use conversation context
+    # Strategy 2: Search without category filter
+    if category:
+        results = search_knowledge(kb, issue_description, category=None, top_k=5, min_similarity=0.3)
+        
+        if results and results[0]["similarity"] >= 0.4:
+            return {
+                "found": True,
+                "solutions": results[:3],
+                "confidence": "medium",
+                "fallback_used": True
+            }
+    
+    # Strategy 3: Use conversation context
     if conversation_history:
         context = " ".join(conversation_history[-5:])  # Last 5 messages
         enhanced_query = f"{issue_description} {context}"
-        results = search_knowledge(kb, enhanced_query, category, top_k=5)
+        results = search_knowledge(kb, enhanced_query, category=None, top_k=5, min_similarity=0.3)
         
-        if results and results[0]["similarity"] >= 0.6:
+        if results and results[0]["similarity"] >= 0.35:
             return {
                 "found": True,
                 "solutions": results[:3],
@@ -192,19 +205,7 @@ def get_best_solution(
                 "fallback_used": True
             }
     
-    # Strategy 3: Broaden search (remove category filter)
-    if category:
-        results = search_knowledge(kb, issue_description, category=None, top_k=5)
-        
-        if results and results[0]["similarity"] >= 0.5:
-            return {
-                "found": True,
-                "solutions": results[:3],
-                "confidence": "medium",
-                "fallback_used": True
-            }
-    
-    # Strategy 4: No good match - return generic help
+    # Strategy 4: No good match
     return {
         "found": False,
         "solutions": [],
@@ -280,21 +281,23 @@ def get_best_solution(
 #     }
 
 def detect_category(message: str) -> Optional[str]:
-    """Detect issue category from user message"""
+    """Detect issue category from user message - returns category matching KB and form templates"""
     message_lower = message.lower()
     
+    # Categories now match KB and form templates
     categories = {
-        "WiFi": ["wifi", "wireless", "internet", "connection", "network", "router"],
-        "Login": ["login", "password", "account", "locked", "authentication", "credentials"],
-        "Hardware": ["slow", "performance", "freeze", "crash", "hardware", "laptop", "computer"],
-        "Software": ["application", "program", "software", "install", "update", "app"]
+        "Network": ["wifi", "wireless", "internet", "connection", "network", "router", "vpn", "ethernet", "connected"],
+        "Account": ["login", "password", "account", "locked", "authentication", "credentials", "mfa", "2fa", "sign in", "sign-in"],
+        "Hardware": ["slow", "performance", "freeze", "crash", "hardware", "laptop", "computer", "monitor", "keyboard", "mouse", "battery", "screen", "display", "audio", "sound", "printer"],
+        "Software": ["application", "program", "software", "install", "update", "app", "office", "word", "excel", "windows update"],
+        "Email": ["email", "outlook", "mail", "inbox", "sending", "receiving", "emails"]
     }
     
     for category, keywords in categories.items():
         if any(keyword in message_lower for keyword in keywords):
             return category
     
-    return None
+    return "General"
 
 class KnowledgeBaseError(Exception):
     """Custom exception for KB operations"""

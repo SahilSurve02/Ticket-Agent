@@ -1,32 +1,141 @@
-from typing import TypedDict, Annotated, List, Optional
+from typing import TypedDict, Annotated, List, Optional, Dict
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
+import uuid
+from datetime import datetime
 
-# 1. The Ticket Structure (as per your requirements)
+# =============================================================================
+# CATEGORY-SPECIFIC FORM TEMPLATES
+# =============================================================================
+# Each category has different fields based on what information is needed
+
+FORM_TEMPLATES = {
+    "Network": {
+        "name": "Network Issue",
+        "extra_fields": ["connection_type", "error_message"],
+        "field_prompts": {
+            "connection_type": "What type of connection are you having issues with?\n  • WiFi\n  • Ethernet/Wired\n  • VPN",
+            "error_message": "Are you seeing any error messages? (Type 'no' if none)"
+        }
+    },
+    "Account": {
+        "name": "Account/Login Issue",
+        "extra_fields": ["account_type", "last_working"],
+        "field_prompts": {
+            "account_type": "What type of account is affected?\n  • Windows/Computer Login\n  • Email\n  • VPN\n  • Application (specify which)",
+            "last_working": "When did it last work correctly? (e.g., 'yesterday', '2 days ago')"
+        }
+    },
+    "Hardware": {
+        "name": "Hardware Issue",
+        "extra_fields": ["component", "physical_damage"],
+        "field_prompts": {
+            "component": "Which hardware component is affected?\n  • Display/Monitor\n  • Keyboard/Mouse\n  • Battery\n  • Audio/Speakers\n  • Other",
+            "physical_damage": "Is there any visible physical damage? (yes/no)"
+        }
+    },
+    "Software": {
+        "name": "Software Issue",
+        "extra_fields": ["application_name", "error_code"],
+        "field_prompts": {
+            "application_name": "What is the name of the application having issues?",
+            "error_code": "Any error codes or messages? (Type 'no' if none)"
+        }
+    },
+    "Email": {
+        "name": "Email Issue",
+        "extra_fields": ["email_client", "affected_action"],
+        "field_prompts": {
+            "email_client": "Which email application are you using?\n  • Outlook Desktop\n  • Outlook Web\n  • Mobile App\n  • Other",
+            "affected_action": "What action is not working?\n  • Sending emails\n  • Receiving emails\n  • Both\n  • Other (calendar, contacts, etc.)"
+        }
+    },
+    "General": {
+        "name": "General IT Issue",
+        "extra_fields": [],
+        "field_prompts": {}
+    }
+}
+
+
+# =============================================================================
+# TICKET SCHEMA - Core ticket fields all categories share
+# =============================================================================
 class TicketSchema(BaseModel):
+    """IT Support Ticket Schema with all required fields"""
+    
+    # Auto-generated fields
+    ticket_id: Optional[str] = Field(None, description="Unique ticket identifier")
+    created_at: Optional[str] = Field(None, description="Timestamp when ticket was created")
+    
+    # User information (would come from login session in production)
+    user_id: Optional[str] = Field(None, description="Employee/User ID")
+    user_name: Optional[str] = Field(None, description="Full name of the user")
+    email: Optional[str] = Field(None, description="User's email address")
+    phone: Optional[str] = Field(None, description="Contact phone number")
+    department: Optional[str] = Field(None, description="User's department")
+    
+    # Issue classification
+    category: Optional[str] = Field(None, description="Issue category: Network, Account, Hardware, Software, Email, General")
+    
+    # Core ticket fields (collected from user)
     issue_summary: Optional[str] = Field(None, description="Short summary of the issue")
-    device_id: Optional[str] = Field(None, description="The specific device")
-    priority: Optional[str] = Field(None, description="Severity: Low, Medium, High")
+    device_id: Optional[str] = Field(None, description="The specific device affected")
+    priority: Optional[str] = Field(None, description="Priority: Low, Medium, High, Critical")
     description: Optional[str] = Field(None, description="Detailed description of the problem")
-    # is_complete: bool = False
+    
+    # Category-specific extra fields (stored as dict)
+    extra_fields: Optional[Dict[str, str]] = Field(default_factory=dict, description="Category-specific additional fields")
 
-# 2. The Graph State
+
+def create_empty_ticket() -> dict:
+    """Create an empty ticket dict with all fields initialized"""
+    return {
+        "ticket_id": None,
+        "created_at": None,
+        "user_id": None,
+        "user_name": None,
+        "email": None,
+        "phone": None,
+        "department": None,
+        "category": None,
+        "issue_summary": None,
+        "device_id": None,
+        "priority": None,
+        "description": None,
+        "extra_fields": {}
+    }
+
+
+def generate_ticket_id() -> str:
+    """Generate a unique ticket ID"""
+    return f"TKT-{uuid.uuid4().hex[:8].upper()}"
+
+
+# =============================================================================
+# AGENT STATE - The main state structure for the workflow
+# =============================================================================
 class AgentState(TypedDict):
-    # 'messages' tracks the entire conversation
+    # Conversation history
     messages: Annotated[List, add_messages]
     
-    # 'ticket' holds the data extracted so far
+    # Current ticket being created/edited
     ticket: TicketSchema
     
-    # 'user_info' would come from the login session (Simulated here)
+    # User context (simulated - would come from login session)
+    user_info: Dict[str, str]  # {user_id, user_name, email, phone, department}
     user_devices: List[str]
-
-    # KB metadata (not the KB object itself - that's not serializable)
-    kb_used: Optional[bool]  # Whether KB was consulted
-    kb_confidence: Optional[str]  # Confidence level of KB results
-    detected_category: Optional[str]  # Auto-detected issue category
-
-    ticket_preview_shown: Optional[bool]  # Track if preview was shown
-    awaiting_confirmation: Optional[bool]  # Waiting for user to confirm ticket
-    last_question: Optional[str]  # Track what question we just asked (device/priority/description)
-    confirmation_action: Optional[str]  # The action from confirmation: submit, edit, cancel
+    
+    # KB metadata
+    kb_used: Optional[bool]
+    kb_confidence: Optional[str]
+    detected_category: Optional[str]
+    
+    # Workflow state tracking
+    ticket_preview_shown: Optional[bool]
+    awaiting_confirmation: Optional[bool]
+    last_question: Optional[str]  # Current field being asked
+    confirmation_action: Optional[str]
+    
+    # Category-specific form tracking
+    current_extra_field_index: Optional[int]  # Which extra field we're currently asking about
