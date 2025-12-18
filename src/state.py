@@ -134,6 +134,7 @@ class AgentState(TypedDict):
     # Workflow state tracking
     ticket_preview_shown: Optional[bool]
     awaiting_confirmation: Optional[bool]
+    awaiting_ticket_confirmation: Optional[bool]  # Waiting for user to confirm they want to create a ticket
     last_question: Optional[str]  # Current field being asked
     confirmation_action: Optional[str]
     

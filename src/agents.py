@@ -38,6 +38,37 @@ class ChatbotAgent:
         """Main processing function for chatbot agent"""
         messages = state["messages"]
         user_message = messages[-1].content if messages else ""
+        awaiting_ticket_confirmation = state.get("awaiting_ticket_confirmation", False)
+        
+        # Handle ticket creation confirmation
+        if awaiting_ticket_confirmation:
+            response_lower = user_message.lower().strip()
+            
+            # User confirms ticket creation
+            if any(word in response_lower for word in ["yes", "yeah", "yep", "sure", "ok", "okay", "please", "yup"]):
+                msg = "I'll transfer you to our Ticket Agent to create a support ticket.\n\nHANDOFF_TO_TICKET_AGENT"
+                print(f"[ChatbotAgent] User confirmed ticket creation, handing off to TicketAgent")
+                return {
+                    "messages": [AIMessage(content=msg)],
+                    "awaiting_ticket_confirmation": False
+                }
+            
+            # User declines ticket creation
+            elif any(word in response_lower for word in ["no", "nope", "nah", "cancel", "nevermind", "never mind"]):
+                msg = "No problem! Is there anything else I can help you with?"
+                print(f"[ChatbotAgent] User declined ticket creation, staying in chatbot mode")
+                return {
+                    "messages": [AIMessage(content=msg)],
+                    "awaiting_ticket_confirmation": False
+                }
+            
+            # Unclear response - ask again
+            else:
+                msg = "I didn't quite catch that. Would you like me to create a support ticket? (yes/no)"
+                return {
+                    "messages": [AIMessage(content=msg)],
+                    "awaiting_ticket_confirmation": True
+                }
         
         # Get KB
         kb = get_global_kb()
@@ -60,6 +91,28 @@ class ChatbotAgent:
             except Exception as e:
                 print(f"[ChatbotAgent] KB search error: {e}")
         
+        # Check if user is reporting solution didn't work (ambiguous feedback)
+        is_ambiguous_feedback = self._is_ambiguous_feedback(user_message, messages)
+        
+        # Check if user explicitly wants a ticket
+        wants_ticket = any(word in user_message.lower() for word in [
+            "create ticket", "file ticket", "submit ticket", "open ticket", 
+            "ticket", "escalate", "need help", "didn't work", "doesn't work",
+            "not working", "still broken", "still issue", "not fixed"
+        ])
+        
+        print(f"[ChatbotAgent] Ambiguous feedback: {is_ambiguous_feedback}, Wants ticket: {wants_ticket}")
+        
+        # If user gives ambiguous feedback or explicitly wants ticket -> ASK FIRST
+        if is_ambiguous_feedback or wants_ticket:
+            msg = "Would you like me to create a support ticket for this issue? I can help you file it with our support team. (yes/no)"
+            print(f"[ChatbotAgent] Asking user for ticket confirmation")
+            return {
+                "messages": [AIMessage(content=msg)],
+                "detected_category": detected_cat,
+                "awaiting_ticket_confirmation": True
+            }
+        
         # Build system prompt
         if kb_results["found"] and kb_results["confidence"] in ["high", "medium"]:
             kb_context = "\n\n".join([
@@ -69,38 +122,27 @@ class ChatbotAgent:
             
             system_prompt = f"""You are the IT Support Chatbot Agent.
 
-KNOWLEDGE BASE SOLUTIONS:
-{kb_context}
+                KNOWLEDGE BASE SOLUTIONS:
+                {kb_context}
 
-YOUR ROLE:
-1. Provide clear troubleshooting steps from the KB
-2. Format as numbered list
-3. Ask: "Let me know if this helps!"
-4. If user says solution didn't work or needs more help:
-   Say EXACTLY: "I'll transfer you to our Ticket Agent to create a support ticket."
-   Then add: "HANDOFF_TO_TICKET_AGENT"
-5. If user directly asks to create/file/submit a ticket:
-   Say EXACTLY: "I'll transfer you to our Ticket Agent."
-   Then add: "HANDOFF_TO_TICKET_AGENT"
+                YOUR ROLE:
+                1. Provide clear troubleshooting steps from the knowledge base.
+                2. Format as numbered list
+                3. Ask: "Let me know if this helps!"
 
-Keep responses SHORT and solution-focused.
-"""
+                Keep responses SHORT and solution-focused.
+                DO NOT mention tickets or escalation - I handle that separately.
+                """
         else:
             system_prompt = """You are the IT Support Chatbot Agent.
 
-YOUR ROLE:
-1. Provide 3-4 general troubleshooting steps for IT issues
-2. Say: "I couldn't find a specific solution, but here are general steps:"
-3. Ask: "Let me know if this helps!"
-4. If user says it didn't work or asks for a ticket:
-   Say EXACTLY: "I'll transfer you to our Ticket Agent to create a support ticket."
-   Then add: "HANDOFF_TO_TICKET_AGENT"
-5. If user directly asks to create/file/submit a ticket:
-   Say EXACTLY: "I'll transfer you to our Ticket Agent."
-   Then add: "HANDOFF_TO_TICKET_AGENT"
+                YOUR ROLE:
+                1. Do not provide solutions from your knowledge base.
+                2. Say: "I couldn't find a specific solution, could you please provide more details about the issue?"
 
-Keep responses SHORT and helpful.
-"""
+                Keep responses SHORT and helpful.
+                DO NOT mention tickets or escalation - I handle that separately.
+                """
         
         response = self.llm.invoke([SystemMessage(content=system_prompt)] + messages)
         
@@ -110,6 +152,35 @@ Keep responses SHORT and helpful.
             "kb_used": kb_results["found"],
             "kb_confidence": kb_results.get("confidence", "none")
         }
+    
+    def _is_ambiguous_feedback(self, user_message: str, messages: List) -> bool:
+        """
+        Detect if user is giving ambiguous feedback about solution effectiveness
+        (e.g., "kind of helped", "partially worked", "sort of")
+        """
+        # Only check if we previously provided a solution
+        if len(messages) < 2:
+            return False
+        
+        # Check if previous bot message was a solution
+        prev_bot_msg = None
+        for i in range(len(messages) - 2, -1, -1):
+            if isinstance(messages[i], AIMessage):
+                prev_bot_msg = messages[i].content
+                break
+        
+        if not prev_bot_msg or "Let me know if this helps!" not in prev_bot_msg:
+            return False
+        
+        # Detect ambiguous feedback phrases
+        user_lower = user_message.lower().strip()
+        ambiguous_phrases = [
+            "kind of", "kinda", "sort of", "sorta", "partially", "partly",
+            "somewhat", "a little", "a bit", "not completely", "not fully",
+            "helped a little", "helped some", "only helped", "barely helped"
+        ]
+        
+        return any(phrase in user_lower for phrase in ambiguous_phrases)
 
 
 # =============================================================================

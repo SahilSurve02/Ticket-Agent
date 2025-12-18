@@ -17,6 +17,10 @@ load_dotenv()
 def route_chatbot(state: AgentState):
     """Routes from chatbot based on state"""
     
+    # If awaiting ticket creation confirmation, stay in chatbot to handle response
+    if state.get("awaiting_ticket_confirmation"):
+        return END  # Stay in chatbot, will process confirmation on next user input
+    
     # If awaiting confirmation (preview shown), route to confirmation handler
     if state.get("awaiting_confirmation"):
         return "ticket_confirmation"

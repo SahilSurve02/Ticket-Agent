@@ -101,7 +101,7 @@ def search_knowledge(
     query: str,
     category: Optional[str] = None,
     top_k: int = 3,
-    min_similarity: float = 0.5
+    min_similarity: float = 0.3
 ) -> List[Dict]:
     """
     Search knowledge base with semantic similarity
@@ -136,7 +136,9 @@ def search_knowledge(
         # Convert to similarity: use exponential decay for better distribution
         # similarity = exp(-score) gives us 1.0 for score=0, ~0.37 for score=1
         import math
-        similarity = math.exp(-score)
+        # similarity = math.exp(-score)
+        similarity = 1 / (1 + score) 
+
         
         # Debug: print score info
         print(f"[DEBUG] KB result: L2_dist={score:.4f}, similarity={similarity:.4f}")
@@ -169,9 +171,9 @@ def get_best_solution(
         }
     """
     # Strategy 1: Direct semantic search (with category if available)
-    results = search_knowledge(kb, issue_description, category, top_k=3, min_similarity=0.3)
+    results = search_knowledge(kb, issue_description, category, top_k=3, min_similarity=0.25)
     
-    if results and results[0]["similarity"] >= 0.5:
+    if results and results[0]["similarity"] >= 0.4:
         return {
             "found": True,
             "solutions": results,
@@ -181,9 +183,9 @@ def get_best_solution(
     
     # Strategy 2: Search without category filter
     if category:
-        results = search_knowledge(kb, issue_description, category=None, top_k=5, min_similarity=0.3)
+        results = search_knowledge(kb, issue_description, category=None, top_k=5, min_similarity=0.25)
         
-        if results and results[0]["similarity"] >= 0.4:
+        if results and results[0]["similarity"] >= 0.35:
             return {
                 "found": True,
                 "solutions": results[:3],
