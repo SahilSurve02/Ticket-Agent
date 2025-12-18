@@ -16,7 +16,7 @@ load_dotenv()
 
 def route_chatbot(state: AgentState):
     """Routes from chatbot based on state"""
-    
+   
     # If awaiting ticket creation confirmation, stay in chatbot to handle response
     if state.get("awaiting_ticket_confirmation"):
         return END  # Stay in chatbot, will process confirmation on next user input
@@ -170,7 +170,7 @@ def run_chat():
     # Initial state
     initial_input = {
         "user_info": user_info,
-        "user_devices": ["Dell Latitude 5420", "iPad Pro", "iPhone 14", "MacBook Pro"],
+        "user_devices": ["Dell Latitude 5420", "iPad Pro", "iPhone 14", "MacBook Pro", "HP Printer LaserJet 200"],
         "ticket": create_empty_ticket(),
         "ticket_preview_shown": False,
         "awaiting_confirmation": False,

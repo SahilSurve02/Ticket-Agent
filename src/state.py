@@ -118,6 +118,7 @@ def generate_ticket_id() -> str:
 class AgentState(TypedDict):
     # Conversation history
     messages: Annotated[List, add_messages]
+    # active_agent: Optional[str] # "chatbot" or "ticket"
     
     # Current ticket being created/edited
     ticket: TicketSchema
