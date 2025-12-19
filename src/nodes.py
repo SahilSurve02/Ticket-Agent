@@ -5,12 +5,16 @@ from pydantic import BaseModel
 from src.state import AgentState, TicketSchema, FORM_TEMPLATES, create_empty_ticket, generate_ticket_id
 from src.agents import get_chatbot_agent, get_ticket_agent
 import os
+import json
 from datetime import datetime
 from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize LLM
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+
+# Ticket storage file path
+TICKETS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "tickets.json")
 
 
 # =============================================================================
@@ -20,6 +24,10 @@ def chatbot_node(state: AgentState):
     """
     Chatbot node - delegates to ChatbotAgent for troubleshooting
     """
+    # Skip if in edit mode - let ticket_collection handle it
+    if state.get("edit_mode"):
+        return {}
+    
     # Skip if in ticket mode
     last_question = state.get("last_question")
     awaiting_confirmation = state.get("awaiting_confirmation", False)
@@ -70,6 +78,14 @@ def ticket_preview_node(state: AgentState):
             label = field_name.replace("_", " ").title()
             extra_display += f"**{label}:** {value}\n"
     
+    # Format description nicely (AI-generated summary)
+    description = current_ticket.description or "None"
+    # If description is long, format it better
+    if len(description) > 100:
+        description_display = f"\n{description}"
+    else:
+        description_display = description
+    
     preview = f"""
 📋 **Ticket Preview**
 
@@ -85,7 +101,7 @@ def ticket_preview_node(state: AgentState):
 **Device:** {current_ticket.device_id or "Not provided"}
 **Priority:** {current_ticket.priority or "Medium"}
 {extra_display}
-**Additional Notes:** {current_ticket.description or "None"}
+**Description (AI-Generated):** {description_display}
 
 ---
 
@@ -102,7 +118,9 @@ What would you like to do?
     return {
         "messages": [AIMessage(content=preview)],
         "ticket_preview_shown": True,
-        "awaiting_confirmation": True
+        "awaiting_confirmation": True,
+        "ticket_collection_complete": False,  # Reset flag so we don't loop back here
+        "edit_mode": False  # Reset edit mode
     }
 
 
@@ -123,9 +141,10 @@ def ticket_confirmation_node(state: AgentState):
     
     elif any(word in last_user_message for word in ["edit", "change", "modify", "update"]):
         return {
-            "messages": [AIMessage(content="What would you like to change? (e.g., 'change priority to high' or 'update description')")],
-            "confirmation_action": "edit",
-            "awaiting_confirmation": False
+            "messages": [AIMessage(content="What would you like to change? (e.g., 'change priority to high' or 'change device to Dell')")],
+            "confirmation_action": "",  # Clear action so we don't loop
+            "edit_mode": True,  # Set edit mode so next user message is processed as edit
+            "awaiting_confirmation": False  # Not awaiting submit/edit/cancel anymore
         }
     
     elif any(word in last_user_message for word in ["cancel", "no", "nevermind", "back", "stop"]):
@@ -148,10 +167,39 @@ def ticket_confirmation_node(state: AgentState):
 
 
 # =============================================================================
-# NODE 5: SUBMIT TICKET - Create the final ticket
+# NODE 5: SUBMIT TICKET - Create the final ticket and save to file
 # =============================================================================
+def save_ticket_to_file(ticket_data: dict) -> bool:
+    """Save ticket to JSON file"""
+    try:
+        # Ensure data directory exists
+        os.makedirs(os.path.dirname(TICKETS_FILE), exist_ok=True)
+        
+        # Load existing tickets
+        tickets = []
+        if os.path.exists(TICKETS_FILE):
+            with open(TICKETS_FILE, 'r', encoding='utf-8') as f:
+                try:
+                    tickets = json.load(f)
+                except json.JSONDecodeError:
+                    tickets = []
+        
+        # Append new ticket
+        tickets.append(ticket_data)
+        
+        # Save back to file
+        with open(TICKETS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(tickets, f, indent=2, ensure_ascii=False)
+        
+        print(f"[SYSTEM] Ticket saved to {TICKETS_FILE}")
+        return True
+    except Exception as e:
+        print(f"[ERROR] Failed to save ticket: {e}")
+        return False
+
+
 def submit_ticket_node(state: AgentState):
-    """Create the ticket with all collected information"""
+    """Create the ticket with all collected information and save to file"""
     current_ticket = state["ticket"]
     if isinstance(current_ticket, dict):
         current_ticket = TicketSchema(**current_ticket)
@@ -173,14 +221,23 @@ def submit_ticket_node(state: AgentState):
         "department": user_info.get("department")
     })
     
-    # In production: Save to database, send notifications, etc.
-    print(f"\n[SYSTEM] Ticket Created: {final_ticket.model_dump_json(indent=2)}\n")
+    # Convert to dict for storage
+    ticket_dict = final_ticket.model_dump()
+    
+    # Save to file
+    saved = save_ticket_to_file(ticket_dict)
+    
+    # Also print to console for debugging
+    print(f"\n[SYSTEM] Ticket Created: {json.dumps(ticket_dict, indent=2)}\n")
+    
+    save_status = "Your ticket has been saved to our system." if saved else "Note: There was an issue saving the ticket, but it has been logged."
     
     success_message = f"""✅ **Ticket Created Successfully!**
 
 **Ticket ID:** {ticket_id}
 **Created:** {created_at}
 
+{save_status}
 Your ticket has been submitted and assigned to the IT Support team.
 You will receive updates at {user_info.get('email', 'your registered email')}.
 
@@ -192,5 +249,7 @@ Is there anything else I can help you with?"""
         "ticket_preview_shown": False,
         "awaiting_confirmation": False,
         "last_question": None,
-        "current_extra_field_index": 0
+        "current_extra_field_index": 0,
+        "edit_mode": False,
+        "ticket_collection_complete": False
     }

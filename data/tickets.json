@@ -1,0 +1,62 @@
+[
+  {
+    "ticket_id": "TKT-2F8ACCC4",
+    "created_at": "2025-12-19 12:54:12",
+    "user_id": "EMP-12345",
+    "user_name": "John Doe",
+    "email": "john.doe@company.com",
+    "phone": "+1-555-0123",
+    "department": "Engineering",
+    "category": "General",
+    "issue_summary": "Dell laptop working very slow",
+    "device_id": "Dell Latitude 5420",
+    "priority": "Medium",
+    "description": "None provided",
+    "extra_fields": {}
+  },
+  {
+    "ticket_id": "TKT-ACF4FFB7",
+    "created_at": "2025-12-19 13:02:12",
+    "user_id": "EMP-12345",
+    "user_name": "John Doe",
+    "email": "john.doe@company.com",
+    "phone": "+1-555-0123",
+    "department": "Engineering",
+    "category": "General",
+    "issue_summary": "Laptop is working very slow",
+    "device_id": "Dell Latitude 5420",
+    "priority": "High",
+    "description": "None provided",
+    "extra_fields": {}
+  },
+  {
+    "ticket_id": "TKT-77CE6FBA",
+    "created_at": "2025-12-19 15:45:22",
+    "user_id": "EMP-12345",
+    "user_name": "John Doe",
+    "email": "john.doe@company.com",
+    "phone": "+1-555-0123",
+    "department": "Engineering",
+    "category": "General",
+    "issue_summary": "Dell Laptop working very slow",
+    "device_id": "MacBook Pro",
+    "priority": "High",
+    "description": "**Ticket Description:**\n\n**Issue Reported:** The user reported that their Dell laptop is operating very slowly.\n\n**Troubleshooting Steps Attempted:**\n1. Advised the user to close unnecessary programs and browser tabs.\n2. Suggested restarting the laptop to clear temporary files and processes.\n3. Recommended checking for malware using Windows Defender or another antivirus program.\n4. Instructed the user to free up disk space by deleting unused files and programs.\n5. Advised disabling unnecessary startup programs.\n6. Suggested updating the operating system and drivers.\n7. Discussed the possibility of upgrading RAM or switching to an SSD.\n\n**Outcome:** The user acknowledged the troubleshooting steps but did not confirm if any improvements were observed. Further follow-up may be required to assess the situation.",
+    "extra_fields": {}
+  },
+  {
+    "ticket_id": "TKT-92874EB6",
+    "created_at": "2025-12-19 16:15:23",
+    "user_id": "EMP-12345",
+    "user_name": "John Doe",
+    "email": "john.doe@company.com",
+    "phone": "+1-555-0123",
+    "department": "Engineering",
+    "category": "General",
+    "issue_summary": "Device is very slow",
+    "device_id": "iPad Pro",
+    "priority": "High",
+    "description": "Ticket Description: User reported that their MacBook is running very slow. Troubleshooting steps attempted included closing background applications, checking for malware, clearing temporary files, disabling unnecessary startup programs, and updating the operating system and drivers. The issue persists.",
+    "extra_fields": {}
+  }
+]

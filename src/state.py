@@ -145,3 +145,4 @@ class AgentState(TypedDict):
     # Multi-agent tracking
     current_agent: Optional[str]  # "chatbot" or "ticket"
     ticket_collection_complete: Optional[bool]  # Flag when all ticket fields collected
+    edit_mode: Optional[bool]  # Flag when user is editing ticket details

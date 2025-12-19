@@ -17,6 +17,10 @@ load_dotenv()
 def route_chatbot(state: AgentState):
     """Routes from chatbot based on state"""
    
+    # If in edit mode, route to ticket_collection to process the edit
+    if state.get("edit_mode"):
+        return "ticket_collection"
+    
     # If awaiting ticket creation confirmation, stay in chatbot to handle response
     if state.get("awaiting_ticket_confirmation"):
         return END  # Stay in chatbot, will process confirmation on next user input
@@ -51,7 +55,12 @@ def route_chatbot(state: AgentState):
 
 
 def route_ticket_collection(state: AgentState):
-    """Routes from ticket collection - check if all fields collected"""
+    """Routes from ticket collection - check if all fields collected or edit completed"""
+    
+    # If ticket collection is complete (set by TicketAgent after edit), go to preview
+    if state.get("ticket_collection_complete"):
+        return "ticket_preview"
+    
     current_ticket = state.get("ticket", {})
     if isinstance(current_ticket, dict):
         current_ticket = TicketSchema(**current_ticket)
@@ -84,7 +93,9 @@ def route_confirmation(state: AgentState):
     if action == "submit":
         return "submit_ticket"
     elif action == "edit":
-        return "ticket_collection"
+        # Don't immediately route to ticket_collection
+        # Instead, END and wait for user's next message (the actual edit request)
+        return END
     elif action == "cancel":
         return END  # Just end, state already reset
     else:
