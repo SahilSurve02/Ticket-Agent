@@ -133,7 +133,7 @@ def ticket_confirmation_node(state: AgentState):
     
     elif any(word in last_user_message for word in ["edit", "change", "modify", "update"]):
         return {
-            "messages": [AIMessage(content="What would you like to change? (e.g., 'change priority to high' or 'change device to Dell')")],
+            "messages": [AIMessage(content="What would you like to change? (e.g., 'change priority to ...' or 'change device to ...')")],
             "confirmation_action": "",  # Clear action so we don't loop
             "edit_mode": True,  # Set edit mode so next user message is processed as edit
             "awaiting_confirmation": False  # Not awaiting submit/edit/cancel anymore
