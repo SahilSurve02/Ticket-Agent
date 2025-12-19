@@ -28,3 +28,6 @@ httpx
 
 # Utilities
 aiofiles
+
+# UI Framework
+streamlit

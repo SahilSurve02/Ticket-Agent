@@ -76,36 +76,28 @@ def ticket_preview_node(state: AgentState):
         for field_name, value in current_ticket.extra_fields.items():
             # Convert field_name to readable label
             label = field_name.replace("_", " ").title()
-            extra_display += f"**{label}:** {value}\n"
+            extra_display += f"**{label}:** {value}\\n"
     
-    # Format description nicely (AI-generated summary)
+    # Format description nicely
     description = current_ticket.description or "None"
-    # If description is long, format it better
-    if len(description) > 100:
-        description_display = f"\n{description}"
-    else:
-        description_display = description
     
     preview = f"""
 📋 **Ticket Preview**
 
-**--- User Information ---**
-**Name:** {user_info.get('user_name', 'N/A')}
-**Email:** {user_info.get('email', 'N/A')}
-**Phone:** {user_info.get('phone', 'N/A')}
+### 👤 User Information
+**Name:** {user_info.get('user_name', 'N/A')}  
+**Email:** {user_info.get('email', 'N/A')}  
+**Phone:** {user_info.get('phone', 'N/A')}  
 **Department:** {user_info.get('department', 'N/A')}
 
-**--- Issue Details ---**
-**Category:** {template['name']}
-**Issue Summary:** {current_ticket.issue_summary or "Not provided"}
-**Device:** {current_ticket.device_id or "Not provided"}
-**Priority:** {current_ticket.priority or "Medium"}
+### 🎫 Issue Details
+**Category:** {template['name']}  
+**Issue Summary:** {current_ticket.issue_summary or "Not provided"}  
+**Device:** {current_ticket.device_id or "Not provided"}  
+**Priority:** {current_ticket.priority or "Medium"}  
 {extra_display}
-**Description (AI-Generated):** {description_display}
-
----
-
-Please review the information above.
+**Description (AI-Generated):**  
+{description}
 
 **Options:**
 • Type **"submit"** to create the ticket
@@ -119,8 +111,8 @@ What would you like to do?
         "messages": [AIMessage(content=preview)],
         "ticket_preview_shown": True,
         "awaiting_confirmation": True,
-        "ticket_collection_complete": False,  # Reset flag so we don't loop back here
-        "edit_mode": False  # Reset edit mode
+        "ticket_collection_complete": False,
+        "edit_mode": False
     }
 
 
@@ -234,12 +226,19 @@ def submit_ticket_node(state: AgentState):
     
     success_message = f"""✅ **Ticket Created Successfully!**
 
-**Ticket ID:** {ticket_id}
-**Created:** {created_at}
+**Ticket ID:** `{ticket_id}`  
+**Created:** {created_at}  
+**Priority:** {final_ticket.priority}  
+**Category:** {final_ticket.category}
+
+---
 
 {save_status}
-Your ticket has been submitted and assigned to the IT Support team.
-You will receive updates at {user_info.get('email', 'your registered email')}.
+
+Your ticket has been submitted and assigned to the IT Support team.  
+📧 Updates will be sent to: **{user_info.get('email', 'your registered email')}**
+
+---
 
 Is there anything else I can help you with?"""
     

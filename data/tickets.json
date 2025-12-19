@@ -58,5 +58,35 @@
     "priority": "High",
     "description": "Ticket Description: User reported that their MacBook is running very slow. Troubleshooting steps attempted included closing background applications, checking for malware, clearing temporary files, disabling unnecessary startup programs, and updating the operating system and drivers. The issue persists.",
     "extra_fields": {}
+  },
+  {
+    "ticket_id": "TKT-8B19122F",
+    "created_at": "2025-12-19 16:54:24",
+    "user_id": "EMP-12345",
+    "user_name": "John Doe",
+    "email": "john.doe@company.com",
+    "phone": "+1-555-0123",
+    "department": "Engineering",
+    "category": "General",
+    "issue_summary": "Laptop is very slow",
+    "device_id": "MacBook Pro",
+    "priority": "High",
+    "description": "Ticket Description: User reported that their laptop is very slow. Troubleshooting steps attempted included closing unnecessary programs, checking for malware, clearing temporary files, disabling startup programs, and suggesting a RAM upgrade or SSD. User indicated that performance improved slightly.",
+    "extra_fields": {}
+  },
+  {
+    "ticket_id": "TKT-E5F6F862",
+    "created_at": "2025-12-19 17:08:24",
+    "user_id": "EMP-12345",
+    "user_name": "John Doe",
+    "email": "john.doe@company.com",
+    "phone": "+1-555-0123",
+    "department": "Engineering",
+    "category": "General",
+    "issue_summary": "Dell Laptop working very slow",
+    "device_id": "MacBook Pro",
+    "priority": "High",
+    "description": "Ticket Description: User reported that their Dell laptop is operating very slowly. Troubleshooting steps attempted included closing unnecessary programs, disabling startup programs, running Disk Cleanup, and checking for malware. The issue persists, requiring further investigation.",
+    "extra_fields": {}
   }
 ]
