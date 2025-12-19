@@ -21,7 +21,7 @@ load_dotenv()
 # PAGE CONFIGURATION
 # =============================================================================
 st.set_page_config(
-    page_title="IT Support Chatbot",
+    page_title="OF  IT Support Chatbot",
     page_icon="🎫",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -647,7 +647,7 @@ def render_sidebar():
 
 def render_chat():
     """Render the main chat interface"""
-    st.title("🤖 IT Support Chatbot")
+    st.title("🤖 OF IT Support Chatbot")
     st.caption("Powered by Multi-Agent AI System | LangGraph + GPT-4")
     
     # Welcome message if no messages
