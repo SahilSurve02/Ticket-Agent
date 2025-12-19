@@ -88,5 +88,53 @@
     "priority": "High",
     "description": "Ticket Description: User reported that their Dell laptop is operating very slowly. Troubleshooting steps attempted included closing unnecessary programs, disabling startup programs, running Disk Cleanup, and checking for malware. The issue persists, requiring further investigation.",
     "extra_fields": {}
+  },
+  {
+    "ticket_id": "TKT-8A702CB3",
+    "created_at": "2025-12-19 17:22:25",
+    "user_id": "EMP-12345",
+    "user_name": "Krishna Ronaldo",
+    "email": "krishna.ronaldo@company.com",
+    "phone": "+1-777-0123",
+    "department": "Engineering",
+    "category": "General",
+    "issue_summary": "Laptop is very slow",
+    "device_id": "Dell Latitude 5420",
+    "priority": "Medium",
+    "description": "Ticket Description: User reported that their laptop is very slow. Troubleshooting steps attempted included closing unnecessary programs, checking for malware, clearing temporary files, disabling startup programs, and suggesting a RAM upgrade or SSD. User indicated partial improvement. Further assistance may be required.",
+    "extra_fields": {}
+  },
+  {
+    "ticket_id": "TKT-A269A5BD",
+    "created_at": "2025-12-19 17:25:32",
+    "user_id": "EMP-12345",
+    "user_name": "Krishna Ronaldo",
+    "email": "krishna.ronaldo@company.com",
+    "phone": "+1-777-0123",
+    "department": "Engineering",
+    "category": "Network",
+    "issue_summary": "Wifi not working",
+    "device_id": "iPad Pro",
+    "priority": "High",
+    "description": "User reported WiFi connectivity issues. Support inquired about the type of connection and any error messages. No further troubleshooting steps were documented. Outcome: Issue remains unresolved.",
+    "extra_fields": {
+      "connection_type": "Wifi",
+      "error_message": "N/A"
+    }
+  },
+  {
+    "ticket_id": "TKT-9AF61D9D",
+    "created_at": "2025-12-19 17:30:25",
+    "user_id": "EMP-12345",
+    "user_name": "Krishna Ronaldo",
+    "email": "krishna.ronaldo@company.com",
+    "phone": "+1-777-0123",
+    "department": "Engineering",
+    "category": "General",
+    "issue_summary": "Device is working slow",
+    "device_id": "HP Printer LaserJet 200",
+    "priority": "High",
+    "description": "Ticket Description: User reported slow performance on their device. Troubleshooting steps included closing background applications, clearing cache, checking for malware, updating software, and restarting the device. User indicated partial improvement. Further assistance may be required, specifically related to an HP printer issue.",
+    "extra_fields": {}
   }
 ]

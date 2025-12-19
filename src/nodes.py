@@ -96,7 +96,7 @@ def ticket_preview_node(state: AgentState):
 **Device:** {current_ticket.device_id or "Not provided"}  
 **Priority:** {current_ticket.priority or "Medium"}  
 {extra_display}
-**Description (AI-Generated):**  
+**Description:**  
 {description}
 
 **Options:**

@@ -172,9 +172,9 @@ def run_chat():
     # Simulated user info (would come from login session in production)
     user_info = {
         "user_id": "EMP-12345",
-        "user_name": "John Doe",
-        "email": "john.doe@company.com",
-        "phone": "+1-555-0123",
+        "user_name": "Krishna Ronaldo",
+        "email": "krishna.ronaldo@company.com",
+        "phone": "+1-777-0123",
         "department": "Engineering"
     }
     
