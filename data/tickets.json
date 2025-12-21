@@ -151,5 +151,35 @@
     "priority": "High",
     "description": "Ticket Description: User reported significant performance degradation on their Dell laptop, experiencing slow response times for simple tasks. Troubleshooting steps attempted included closing unnecessary programs, disabling startup programs, running Disk Cleanup, and checking for malware. Outcome: Performance issues persist despite these efforts.",
     "extra_fields": {}
+  },
+  {
+    "ticket_id": "TKT-80AE5632",
+    "created_at": "2025-12-22 02:10:08",
+    "user_id": "EMP-12345",
+    "user_name": "Krishna Ronaldo",
+    "email": "krishna.ronaldo@company.com",
+    "phone": "+1-777-0123",
+    "department": "Engineering",
+    "category": "General",
+    "issue_summary": "Laptop working very slow",
+    "device_id": "Dell Latitude 5420",
+    "priority": "High",
+    "description": "Ticket Description: User reported that their laptop is operating very slowly. Troubleshooting steps attempted included closing unnecessary programs, checking for malware, clearing temporary files, disabling startup programs, and suggesting a RAM upgrade or SSD installation. User indicated that the steps provided offered some improvement.",
+    "extra_fields": {}
+  },
+  {
+    "ticket_id": "TKT-81109E66",
+    "created_at": "2025-12-22 02:13:35",
+    "user_id": "EMP-12345",
+    "user_name": "Krishna Ronaldo",
+    "email": "krishna.ronaldo@company.com",
+    "phone": "+1-777-0123",
+    "department": "Engineering",
+    "category": "General",
+    "issue_summary": "Unable to connect Dell laptop to WiFi",
+    "device_id": "Dell Latitude 5420",
+    "priority": "High",
+    "description": "User reported inability to connect Dell laptop to WiFi. Troubleshooting steps attempted included verifying credentials, forgetting and reconnecting to the network, checking Active Directory account status, confirming device domain-join, and updating security certificates. Outcome: Issue remains unresolved. Further assistance required.",
+    "extra_fields": {}
   }
 ]

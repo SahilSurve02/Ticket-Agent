@@ -9,13 +9,32 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
+# =============================================================================
+# ROUTING CONFIGURATION
+# =============================================================================
+# Set to True to use LLM-based intelligent routing
+# Set to False to use rule-based routing (faster, but less flexible)
+USE_LLM_ROUTING = os.getenv("USE_LLM_ROUTING", "false").lower() == "true"
+
+# Import LLM router if enabled
+if USE_LLM_ROUTING:
+    try:
+        from src.router import route_chatbot_llm, route_ticket_collection_llm, route_confirmation_llm
+        print("[ROUTING] Using LLM-based intelligent routing")
+    except ImportError as e:
+        print(f"[ROUTING] LLM router not available, falling back to rule-based: {e}")
+        USE_LLM_ROUTING = False
+
+if not USE_LLM_ROUTING:
+    print("[ROUTING] Using rule-based routing")
+
 
 # =============================================================================
-# ROUTING LOGIC
+# RULE-BASED ROUTING LOGIC (Default - Fast and Reliable)
 # =============================================================================
 
-def route_chatbot(state: AgentState):
-    """Routes from chatbot based on state"""
+def route_chatbot_rules(state: AgentState):
+    """Routes from chatbot based on state - Rule-based implementation"""
    
     # If in edit mode, route to ticket_collection to process the edit
     if state.get("edit_mode"):
@@ -54,8 +73,8 @@ def route_chatbot(state: AgentState):
     return END
 
 
-def route_ticket_collection(state: AgentState):
-    """Routes from ticket collection - check if all fields collected or edit completed"""
+def route_ticket_collection_rules(state: AgentState):
+    """Routes from ticket collection - Rule-based implementation"""
     
     # If ticket collection is complete (set by TicketAgent after edit), go to preview
     if state.get("ticket_collection_complete"):
@@ -86,8 +105,8 @@ def route_ticket_collection(state: AgentState):
     return END  # Wait for user response
 
 
-def route_confirmation(state: AgentState):
-    """Routes from confirmation based on user's choice"""
+def route_confirmation_rules(state: AgentState):
+    """Routes from confirmation based on user's choice - Rule-based implementation"""
     action = state.get("confirmation_action", "")
     
     if action == "submit":
@@ -100,6 +119,35 @@ def route_confirmation(state: AgentState):
         return END  # Just end, state already reset
     else:
         return END  # Invalid response, wait for valid input
+
+
+# =============================================================================
+# ROUTER SELECTION - Choose between LLM-based and Rule-based
+# =============================================================================
+
+def route_chatbot(state: AgentState):
+    """Main chatbot router - uses LLM or rules based on configuration"""
+    if USE_LLM_ROUTING:
+        result = route_chatbot_llm(state)
+        # Convert string result to END if needed
+        return END if result == "END" else result
+    return route_chatbot_rules(state)
+
+
+def route_ticket_collection(state: AgentState):
+    """Main ticket collection router - uses LLM or rules based on configuration"""
+    if USE_LLM_ROUTING:
+        result = route_ticket_collection_llm(state)
+        return END if result == "END" else result
+    return route_ticket_collection_rules(state)
+
+
+def route_confirmation(state: AgentState):
+    """Main confirmation router - uses LLM or rules based on configuration"""
+    if USE_LLM_ROUTING:
+        result = route_confirmation_llm(state)
+        return END if result == "END" else result
+    return route_confirmation_rules(state)
 
 
 # =============================================================================

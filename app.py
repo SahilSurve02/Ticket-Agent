@@ -18,6 +18,20 @@ from datetime import datetime
 load_dotenv()
 
 # =============================================================================
+# ROUTING CONFIGURATION
+# =============================================================================
+USE_LLM_ROUTING = os.getenv("USE_LLM_ROUTING", "false").lower() == "true"
+
+# Import LLM router if enabled
+if USE_LLM_ROUTING:
+    try:
+        from src.router import route_chatbot_llm, route_ticket_collection_llm, route_confirmation_llm
+        print("[UI ROUTING] Using LLM-based intelligent routing")
+    except ImportError as e:
+        print(f"[UI ROUTING] LLM router not available, falling back to rule-based: {e}")
+        USE_LLM_ROUTING = False
+
+# =============================================================================
 # PAGE CONFIGURATION
 # =============================================================================
 st.set_page_config(
@@ -327,8 +341,8 @@ st.markdown("""
 # WORKFLOW GRAPH SETUP (Same as main.py)
 # =============================================================================
 
-def route_chatbot(state: AgentState):
-    """Routes from chatbot based on state"""
+def route_chatbot_rules(state: AgentState):
+    """Routes from chatbot based on state - Rule-based implementation"""
     if state.get("edit_mode"):
         return "ticket_collection"
     
@@ -356,8 +370,8 @@ def route_chatbot(state: AgentState):
     return END
 
 
-def route_ticket_collection(state: AgentState):
-    """Routes from ticket collection"""
+def route_ticket_collection_rules(state: AgentState):
+    """Routes from ticket collection - Rule-based implementation"""
     if state.get("ticket_collection_complete"):
         return "ticket_preview"
     
@@ -383,8 +397,8 @@ def route_ticket_collection(state: AgentState):
     return END
 
 
-def route_confirmation(state: AgentState):
-    """Routes from confirmation based on user's choice"""
+def route_confirmation_rules(state: AgentState):
+    """Routes from confirmation based on user's choice - Rule-based implementation"""
     action = state.get("confirmation_action", "")
     
     if action == "submit":
@@ -393,6 +407,30 @@ def route_confirmation(state: AgentState):
         return END
     
     return END
+
+
+def route_chatbot(state: AgentState):
+    """Main chatbot router - uses LLM or rules based on configuration"""
+    if USE_LLM_ROUTING:
+        result = route_chatbot_llm(state)
+        return END if result == "END" else result
+    return route_chatbot_rules(state)
+
+
+def route_ticket_collection(state: AgentState):
+    """Main ticket collection router - uses LLM or rules based on configuration"""
+    if USE_LLM_ROUTING:
+        result = route_ticket_collection_llm(state)
+        return END if result == "END" else result
+    return route_ticket_collection_rules(state)
+
+
+def route_confirmation(state: AgentState):
+    """Main confirmation router - uses LLM or rules based on configuration"""
+    if USE_LLM_ROUTING:
+        result = route_confirmation_llm(state)
+        return END if result == "END" else result
+    return route_confirmation_rules(state)
 
 
 def build_workflow():
