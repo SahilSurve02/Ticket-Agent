@@ -136,5 +136,20 @@
     "priority": "High",
     "description": "Ticket Description: User reported slow performance on their device. Troubleshooting steps included closing background applications, clearing cache, checking for malware, updating software, and restarting the device. User indicated partial improvement. Further assistance may be required, specifically related to an HP printer issue.",
     "extra_fields": {}
+  },
+  {
+    "ticket_id": "TKT-27205E1E",
+    "created_at": "2025-12-22 00:24:00",
+    "user_id": "EMP-12345",
+    "user_name": "Krishna Ronaldo",
+    "email": "krishna.ronaldo@company.com",
+    "phone": "+1-777-0123",
+    "department": "Engineering",
+    "category": "General",
+    "issue_summary": "Laptop performance degradation",
+    "device_id": "MacBook Pro",
+    "priority": "High",
+    "description": "Ticket Description: User reported significant performance degradation on their Dell laptop, experiencing slow response times for simple tasks. Troubleshooting steps attempted included closing unnecessary programs, disabling startup programs, running Disk Cleanup, and checking for malware. Outcome: Performance issues persist despite these efforts.",
+    "extra_fields": {}
   }
 ]
