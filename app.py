@@ -21,106 +21,303 @@ load_dotenv()
 # PAGE CONFIGURATION
 # =============================================================================
 st.set_page_config(
-    page_title="OF  IT Support Chatbot",
+    page_title="OF IT Support Chatbot",
     page_icon="🎫",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling
+# Custom CSS - Gemini AI Inspired Design
 st.markdown("""
 <style>
-    /* Chat message styling with theme support */
+    /* === GEMINI-INSPIRED CLEAN DARK THEME === */
+    
+    /* Main app background */
+    .stApp {
+        background-color: #1e1e1e;
+    }
+    
+    /* Main content area */
+    .main .block-container {
+        padding: 2rem 3rem;
+        max-width: 1200px;
+    }
+    
+    /* === SIDEBAR STYLING === */
+    section[data-testid="stSidebar"] {
+        background-color: #171717;
+        border-right: 1px solid #2d2d2d;
+    }
+    
+    section[data-testid="stSidebar"] > div {
+        padding: 1.5rem 1rem;
+    }
+    
+    /* Sidebar headings */
+    section[data-testid="stSidebar"] h3 {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #9ca3af;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 1rem;
+        padding-left: 0.5rem;
+    }
+    
+    /* Sidebar dividers */
+    section[data-testid="stSidebar"] hr {
+        margin: 1.5rem 0;
+        border: none;
+        border-top: 1px solid #2d2d2d;
+    }
+    
+    /* Sidebar metrics */
+    section[data-testid="stSidebar"] div[data-testid="stMetricValue"] {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #6366f1;
+    }
+    
+    section[data-testid="stSidebar"] div[data-testid="stMetricLabel"] {
+        color: #9ca3af;
+        font-size: 0.75rem;
+    }
+    
+    /* Sidebar expanders */
+    section[data-testid="stSidebar"] .streamlit-expanderHeader {
+        background-color: #252525;
+        border-radius: 8px;
+        padding: 0.75rem;
+        font-size: 0.875rem;
+        color: #e5e7eb;
+        border: 1px solid #2d2d2d;
+    }
+    
+    section[data-testid="stSidebar"] .streamlit-expanderHeader:hover {
+        background-color: #2d2d2d;
+        border-color: #3d3d3d;
+    }
+    
+    /* === CHAT MESSAGES === */
     .stChatMessage {
-        padding: 10px;
-        margin: 5px 0;
-        border-radius: 10px;
+        background-color: transparent !important;
+        padding: 1.5rem 0;
+        border-radius: 0;
+        border: none;
+        animation: fadeInUp 0.4s ease-out;
     }
     
-    /* User message (more visible) */
-    div[data-testid="stChatMessageContent"] {
-        background-color: rgba(28, 131, 225, 0.1);
-        padding: 12px;
-        border-radius: 8px;
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
     
-    /* Make sure text is always visible */
-    .stMarkdown, .stChatMessage p {
-        color: inherit !important;
+    /* User message */
+    div[data-testid="stChatMessage"][data-testid="stChatMessageContent"] {
+        background-color: transparent;
     }
     
-    /* Button styling */
+    /* Message content */
+    .stChatMessage > div {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    /* Message text */
+    .stChatMessage p {
+        color: #e5e7eb;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        margin: 0;
+    }
+    
+    /* === BUTTONS === */
     .stButton button {
-        border-radius: 8px;
+        background-color: #2d2d2d;
+        color: #e5e7eb;
+        border: 1px solid #3d3d3d;
+        border-radius: 20px;
+        padding: 0.65rem 1.5rem;
+        font-size: 0.875rem;
         font-weight: 500;
-        transition: all 0.3s ease;
-        border: 2px solid transparent;
+        transition: all 0.2s ease;
+        height: auto;
     }
     
     .stButton button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        border-color: rgba(28, 131, 225, 0.5);
+        background-color: #3d3d3d;
+        border-color: #4d4d4d;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
     
-    /* Primary button (Submit) */
+    /* Primary button */
     .stButton button[kind="primary"] {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        border: none;
+        font-weight: 600;
     }
     
     .stButton button[kind="primary"]:hover {
-        background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        background: linear-gradient(135deg, #5558e3 0%, #7c3aed 100%);
+        box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
     }
     
-    /* Info boxes with theme support */
-    .ticket-preview {
-        background-color: rgba(33, 150, 243, 0.15);
-        border-left: 4px solid #2196F3;
-        padding: 15px;
-        border-radius: 5px;
-        margin: 10px 0;
-    }
-    .success-box {
-        background-color: rgba(76, 175, 80, 0.15);
-        border-left: 4px solid #4CAF50;
-        padding: 15px;
-        border-radius: 5px;
-        margin: 10px 0;
-        color: inherit;
-    }
-    .warning-box {
-        background-color: rgba(255, 152, 0, 0.15);
-        border-left: 4px solid #FF9800;
-        padding: 15px;
-        border-radius: 5px;
-        margin: 10px 0;
-        color: inherit;
-    }
-    
-    /* Sidebar styling */
-    div[data-testid="stMetricValue"] {
-        font-size: 20px;
-    }
-    
-    /* Chat input */
+    /* === CHAT INPUT === */
     .stChatInput {
-        border-radius: 10px;
+        border-top: 1px solid #2d2d2d;
+        padding-top: 1rem;
     }
     
-    /* Loading indicator */
+    .stChatInput > div {
+        background-color: #2d2d2d;
+        border: 1px solid #3d3d3d;
+        border-radius: 24px;
+        padding: 0.5rem 1rem;
+    }
+    
+    .stChatInput textarea {
+        color: #e5e7eb;
+        font-size: 0.95rem;
+    }
+    
+    .stChatInput > div:focus-within {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+    }
+    
+    /* === HEADERS === */
+    h1 {
+        color: #f9fafb;
+        font-size: 1.75rem;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+    
+    h2, h3 {
+        color: #e5e7eb;
+        font-weight: 600;
+    }
+    
+    /* Caption text */
+    .stCaption {
+        color: #9ca3af;
+        font-size: 0.875rem;
+    }
+    
+    /* === ALERTS & INFO BOXES === */
+    .stAlert {
+        background-color: #252525;
+        border: 1px solid #3d3d3d;
+        border-radius: 12px;
+        color: #e5e7eb;
+    }
+    
+    .stSuccess {
+        background-color: rgba(34, 197, 94, 0.1);
+        border-left: 4px solid #22c55e;
+    }
+    
+    .stWarning {
+        background-color: rgba(251, 146, 60, 0.1);
+        border-left: 4px solid #fb923c;
+    }
+    
+    .stInfo {
+        background-color: rgba(59, 130, 246, 0.1);
+        border-left: 4px solid #3b82f6;
+    }
+    
+    /* === CUSTOM CONTAINERS === */
+    div[data-testid="column"] {
+        padding: 0.25rem;
+    }
+    
+    /* === LOADING SPINNER === */
     .stSpinner > div {
-        border-color: #1f77b4 !important;
+        border-color: #6366f1 !important;
     }
     
-    /* Improve spacing in chat */
-    .element-container {
-        margin-bottom: 0.5rem;
+    /* === SCROLLBAR === */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
     }
     
-    /* Make device/category buttons more prominent */
+    ::-webkit-scrollbar-track {
+        background: #171717;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: #3d3d3d;
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: #4d4d4d;
+    }
+    
+    /* === SELECTION BUTTONS (Device, Category, Priority) === */
     div[data-testid="column"] .stButton button {
-        height: 3.5em;
-        font-size: 0.95em;
+        width: 100%;
+        background-color: #252525;
+        border: 1px solid #3d3d3d;
+        border-radius: 12px;
+        padding: 1rem;
+        font-size: 0.9rem;
+        font-weight: 500;
+        text-align: center;
+        min-height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    div[data-testid="column"] .stButton button::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(99, 102, 241, 0.1);
+        transform: translate(-50%, -50%);
+        transition: width 0.3s, height 0.3s;
+    }
+    
+    div[data-testid="column"] .stButton button:hover::before {
+        width: 300px;
+        height: 300px;
+    }
+    
+    div[data-testid="column"] .stButton button:hover {
+        background-color: #2d2d2d;
+        border-color: #6366f1;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
+    }
+    
+    /* === MARKDOWN STYLING === */
+    .stMarkdown {
+        color: #e5e7eb;
+    }
+    
+    /* === JSON/CODE DISPLAY === */
+    .stJson, .stCode {
+        background-color: #252525;
+        border: 1px solid #3d3d3d;
+        border-radius: 8px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -322,6 +519,29 @@ def initialize_session_state():
 def render_message_with_buttons(content: str, message_key: str):
     """Render message content with interactive buttons if applicable"""
     
+    # Check if this is a solution feedback prompt
+    if "Did this help solve your issue?" in content:
+        # Split content to show solution and then feedback buttons
+        parts = content.split("Did this help solve your issue?")
+        solution_text = parts[0].strip()
+        
+        st.markdown(solution_text)
+        st.divider()
+        
+        st.markdown("**Did this help solve your issue?**")
+        col1, col2, col3 = st.columns([1, 1, 2])
+        with col1:
+            if st.button("👍 Yes, Solved!", key=f"{message_key}_thumbs_up", 
+                        use_container_width=True, type="primary"):
+                return "yes solved"
+        with col2:
+            if st.button("👎 No, Still Issues", key=f"{message_key}_thumbs_down", 
+                        use_container_width=True):
+                return "no still issues"
+        with col3:
+            st.caption("Your feedback helps us improve!")
+        return None
+    
     # Check if this is a success message
     if "✅ **Ticket Created Successfully!**" in content:
         st.success("🎉 Ticket Created Successfully!")
@@ -336,25 +556,146 @@ def render_message_with_buttons(content: str, message_key: str):
         st.markdown(remaining)
         return None
     
+    # Check if this is a connection type selection (Network category)
+    elif "What type of connection" in content and "WiFi" in content and "Ethernet" in content:
+        st.markdown("### Connection Type?")
+        st.markdown("")
+        
+        connection_types = [
+            ("📶 WiFi", "Wireless connection", "WiFi"),
+            ("🔌 Ethernet/Wired", "Wired network", "Ethernet/Wired"),
+            ("🔒 VPN", "Virtual Private Network", "VPN")
+        ]
+        
+        cols = st.columns(3)
+        for idx, (label, desc, value) in enumerate(connection_types):
+            with cols[idx]:
+                if st.button(label, key=f"{message_key}_conn_{idx}", 
+                           help=desc, use_container_width=True):
+                    return value
+        return None
+    
+    # Check if this is account type selection (Account category)
+    elif "What type of account" in content and "Windows/Computer Login" in content:
+        st.markdown("### Account Type?")
+        st.markdown("")
+        
+        account_types = [
+            ("🖥️ Windows Login", "Computer login", "Windows/Computer Login"),
+            ("📧 Email", "Email account", "Email"),
+            ("🔒 VPN", "VPN access", "VPN"),
+            ("📱 Application", "App account", "Application")
+        ]
+        
+        cols = st.columns(2)
+        for idx, (label, desc, value) in enumerate(account_types):
+            with cols[idx % 2]:
+                if st.button(label, key=f"{message_key}_acct_{idx}", 
+                           help=desc, use_container_width=True):
+                    return value
+        return None
+    
+    # Check if this is hardware component selection (Hardware category)
+    elif "Which hardware component" in content and "Display/Monitor" in content:
+        st.markdown("### Hardware Component?")
+        st.markdown("")
+        
+        components = [
+            ("🖥️ Display/Monitor", "Screen issues", "Display/Monitor"),
+            ("⌨️ Keyboard/Mouse", "Input devices", "Keyboard/Mouse"),
+            ("🔋 Battery", "Power issues", "Battery"),
+            ("🔊 Audio/Speakers", "Sound problems", "Audio/Speakers"),
+            ("⚙️ Other", "Other hardware", "Other")
+        ]
+        
+        cols = st.columns(3)
+        for idx, (label, desc, value) in enumerate(components):
+            with cols[idx % 3]:
+                if st.button(label, key=f"{message_key}_hw_{idx}", 
+                           help=desc, use_container_width=True):
+                    return value
+        return None
+    
+    # Check if this is email client selection (Email category)
+    elif "Which email application" in content and "Outlook Desktop" in content:
+        st.markdown("### Email Client?")
+        st.markdown("")
+        
+        email_clients = [
+            ("📨 Outlook Desktop", "Desktop app", "Outlook Desktop"),
+            ("🌐 Outlook Web", "Web browser", "Outlook Web"),
+            ("📱 Mobile App", "Phone/tablet", "Mobile App"),
+            ("⚙️ Other", "Other client", "Other")
+        ]
+        
+        cols = st.columns(2)
+        for idx, (label, desc, value) in enumerate(email_clients):
+            with cols[idx % 2]:
+                if st.button(label, key=f"{message_key}_email_{idx}", 
+                           help=desc, use_container_width=True):
+                    return value
+        return None
+    
+    # Check if this is email action selection (Email category)
+    elif "What action is not working" in content and "Sending emails" in content:
+        st.markdown("### What's Not Working?")
+        st.markdown("")
+        
+        actions = [
+            ("📤 Sending emails", "Can't send", "Sending emails"),
+            ("📥 Receiving emails", "Can't receive", "Receiving emails"),
+            ("⛔ Both", "Send & receive", "Both"),
+            ("📅 Other", "Calendar/contacts", "Other (calendar, contacts, etc.)")
+        ]
+        
+        cols = st.columns(2)
+        for idx, (label, desc, value) in enumerate(actions):
+            with cols[idx % 2]:
+                if st.button(label, key=f"{message_key}_action_{idx}", 
+                           help=desc, use_container_width=True):
+                    return value
+        return None
+    
+    # Check if this is physical damage question (yes/no)
+    elif "visible physical damage" in content.lower() and "(yes/no)" in content.lower():
+        st.markdown("### Physical Damage?")
+        st.markdown("")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("✅ Yes", key=f"{message_key}_damage_yes", use_container_width=True):
+                return "yes"
+        with col2:
+            if st.button("❌ No", key=f"{message_key}_damage_no", use_container_width=True):
+                return "no"
+        return None
+    
     # Check if this is a device selection prompt
     if "Which device is affected?" in content or "couldn't find that device" in content:
         lines = content.split('\n')
         text_part = lines[0]
         devices = [line.strip().replace('• ', '') for line in lines if line.strip().startswith('•')]
         
-        st.markdown(text_part)
-        st.markdown("**Select a device:**")
+        st.markdown(f"### {text_part}")
+        st.markdown("")  # Add spacing
         
+        # Determine icon for each device
         cols = st.columns(min(len(devices), 3))
         for idx, device in enumerate(devices):
+            icon = "🖥️" if any(x in device for x in ["Dell", "HP", "Latitude"]) else \
+                   "💻" if "MacBook" in device else \
+                   "📱" if any(x in device for x in ["iPad", "iPhone"]) else \
+                   "🖨️" if "Printer" in device else "🖥️"
             with cols[idx % 3]:
-                if st.button(f"🖥️ {device}", key=f"{message_key}_device_{idx}", use_container_width=True):
+                if st.button(f"{icon} **{device}**", key=f"{message_key}_device_{idx}", 
+                           use_container_width=True):
                     return device
         return None
     
     # Check if this is a category selection prompt
     elif "What category best describes your issue?" in content:
-        st.markdown("**What category best describes your issue?**")
+        st.markdown("### What category best describes your issue?")
+        st.markdown("")  # Add spacing
         
         categories = [
             ("🌐 Network", "WiFi, Internet, VPN", "Network"),
@@ -368,45 +709,116 @@ def render_message_with_buttons(content: str, message_key: str):
         cols = st.columns(3)
         for idx, (emoji_name, desc, value) in enumerate(categories):
             with cols[idx % 3]:
-                if st.button(f"{emoji_name}", key=f"{message_key}_cat_{idx}", 
+                if st.button(emoji_name, key=f"{message_key}_cat_{idx}", 
                            help=desc, use_container_width=True):
                     return value
         return None
     
     # Check if this is a priority selection prompt
-    elif "Please choose a valid priority level" in content or "What is the priority" in content:
-        st.markdown("**Priority Level:**")
+    elif "Priority level?" in content or "Please choose a valid priority level" in content:
+        st.markdown("### Priority level?")
+        st.markdown("")
         
         priorities = [
-            ("🟢 Low", "Can wait", "Low"),
-            ("🟡 Medium", "Affecting work", "Medium"),
-            ("🟠 High", "Blocking work", "High"),
-            ("🔴 Critical", "System down", "Critical")
+            ("🟢 Low", "Can wait • Non-urgent", "Low"),
+            ("🟡 Medium", "Affecting work • Important", "Medium"),
+            ("🟠 High", "Blocking work • Urgent", "High"),
+            ("🔴 Critical", "System down • Emergency", "Critical")
         ]
         
-        cols = st.columns(4)
+        cols = st.columns(2)
         for idx, (emoji_name, desc, value) in enumerate(priorities):
-            with cols[idx]:
-                if st.button(f"{emoji_name}", key=f"{message_key}_pri_{idx}", 
+            with cols[idx % 2]:
+                if st.button(emoji_name, key=f"{message_key}_pri_{idx}", 
                            help=desc, use_container_width=True):
                     return value
         return None
     
     # Check if this is a ticket preview with options
     elif "📋 **Ticket Preview**" in content or "Ticket Preview" in content:
-        # Extract and format ticket preview
+        # Extract ticket preview content
         parts = content.split('**Options:**')
         preview_content = parts[0]
         
-        # Better formatting for ticket preview
-        preview_content = preview_content.replace('**--- User Information ---**', '### 👤 User Information')
-        preview_content = preview_content.replace('**--- Issue Details ---**', '### 🎫 Issue Details')
-        preview_content = preview_content.replace('---', '')
+        # Modern card-style ticket preview
+        st.markdown("### 📋 Ticket Preview")
         
-        st.markdown(preview_content)
+        # User info card with 2x2 grid
+        with st.container():
+            st.markdown("#### 👤 User Information")
+            
+            # Extract user info
+            lines = preview_content.split('\n')
+            user_info = {}
+            in_user_section = False
+            
+            for line in lines:
+                if '### 👤 User Information' in line:
+                    in_user_section = True
+                elif '### 🎫 Issue Details' in line:
+                    in_user_section = False
+                elif in_user_section and '**' in line and ':' in line:
+                    key_val = line.split(':', 1)
+                    key = key_val[0].replace('**', '').strip()
+                    val = key_val[1].strip() if len(key_val) > 1 else ''
+                    user_info[key] = val
+            
+            # Display in 2x2 grid
+            col1, col2 = st.columns(2)
+            user_items = list(user_info.items())
+            
+            with col1:
+                if len(user_items) > 0:
+                    st.markdown(f"**{user_items[0][0]}:** {user_items[0][1]}")
+                if len(user_items) > 2:
+                    st.markdown(f"**{user_items[2][0]}:** {user_items[2][1]}")
+                if len(user_items) > 4:
+                    st.markdown(f"**{user_items[4][0]}:** {user_items[4][1]}")
+            
+            with col2:
+                if len(user_items) > 1:
+                    st.markdown(f"**{user_items[1][0]}:** {user_items[1][1]}")
+                if len(user_items) > 3:
+                    st.markdown(f"**{user_items[3][0]}:** {user_items[3][1]}")
         
         st.divider()
-        st.markdown("**What would you like to do?**")
+        
+        # Issue details
+        with st.container():
+            st.markdown("#### 🎫 Issue Details")
+            issue_info = {}
+            in_issue_section = False
+            
+            for line in lines:
+                if '### 🎫 Issue Details' in line:
+                    in_issue_section = True
+                elif '**Description (AI-Generated):**' in line:
+                    in_issue_section = False
+                elif in_issue_section and '**' in line and ':' in line:
+                    key_val = line.split(':', 1)
+                    key = key_val[0].replace('**', '').strip()
+                    val = key_val[1].strip() if len(key_val) > 1 else ''
+                    if key:
+                        issue_info[key] = val
+            
+            for key, val in issue_info.items():
+                if key == 'Priority':
+                    color = {'Low': '🟢', 'Medium': '🟡', 'High': '🟠', 'Critical': '🔴'}.get(val.strip(), '⚪')
+                    st.markdown(f"**{key}:** {color} {val}")
+                else:
+                    st.markdown(f"**{key}:** {val}")
+        
+        # Description (if exists)
+        if 'Description (AI-Generated)' in preview_content:
+            st.divider()
+            st.markdown("#### 📝 Description")
+            desc_start = preview_content.find('**Description (AI-Generated):**')
+            if desc_start != -1:
+                desc_text = preview_content[desc_start:].replace('**Description (AI-Generated):**', '').strip()
+                st.markdown(desc_text)
+        
+        st.divider()
+        st.markdown("### What would you like to do?")
         
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -572,102 +984,271 @@ def get_ticket_status():
 def render_sidebar():
     """Render the sidebar with user info and session stats"""
     with st.sidebar:
-        st.title("🎫 IT Support")
-        st.caption("Multi-Agent AI System")
-        st.divider()
+        # === MODERN HEADER ===
+        st.markdown("""
+<div style="
+    text-align: center;
+    padding: 1rem 0 1.5rem 0;
+    border-bottom: 1px solid #3d3d3d;
+    margin-bottom: 1.5rem;
+">
+    <div style="font-size: 1.75rem; margin-bottom: 0.25rem;">🎫</div>
+    <div style="font-size: 1.1rem; font-weight: 700; color: #f9fafb;">IT Support</div>
+    <div style="font-size: 0.75rem; color: #6366f1; margin-top: 0.25rem;">Multi-Agent AI</div>
+</div>
+        """, unsafe_allow_html=True)
         
-        # User Information
-        st.subheader("👤 User Profile")
+        # === USER PROFILE CARD ===
         user = st.session_state.user_info
-        st.markdown(f"""
-**{user['user_name']}**  
-📧 {user['email']}  
-📞 {user['phone']}  
-🏢 {user['department']}  
-🆔 {user['user_id']}
-        """)
+        st.markdown("""
+<div style="
+    background: linear-gradient(135deg, #2d2d2d 0%, #252525 100%);
+    border: 1px solid #3d3d3d;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+">
+    <div style="display: flex; align-items: center; margin-bottom: 0.75rem;">
+        <div style="
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            margin-right: 0.75rem;
+        ">👤</div>
+        <div>
+            <div style="font-size: 0.95rem; font-weight: 600; color: #f9fafb;">{}</div>
+            <div style="font-size: 0.7rem; color: #9ca3af;">{}</div>
+        </div>
+    </div>
+    <div style="
+        padding: 0.75rem;
+        background-color: #1e1e1e;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        line-height: 1.8;
+        color: #9ca3af;
+    ">
+        <div style="margin-bottom: 0.3rem;">📧 {}</div>
+        <div style="margin-bottom: 0.3rem;">📞 {}</div>
+        <div>🆔 {}</div>
+    </div>
+</div>
+        """.format(
+            user['user_name'],
+            user['department'],
+            user['email'],
+            user['phone'],
+            user['user_id']
+        ), unsafe_allow_html=True)
         
-        st.divider()
-        
-        # Session Statistics
-        st.subheader("📊 Session Stats")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Tickets Created", st.session_state.tickets_submitted)
-        with col2:
-            messages_count = len(st.session_state.messages)
-            st.metric("Messages", messages_count)
-        
-        # Session duration
+        # === SESSION METRICS GRID ===
         duration = datetime.now() - st.session_state.session_start
         minutes = int(duration.total_seconds() / 60)
-        st.metric("Session Time", f"{minutes} min")
-        
-        st.divider()
-        
-        # Current Ticket Status
-        st.subheader("🎟️ Ticket Status")
         status = get_ticket_status()
-        if "No active" in status:
-            st.info(status)
-        elif "In Progress" in status:
-            st.warning(status)
-        else:
-            st.success(status)
+        status_label = "Active" if "In Progress" in status else "Idle"
+        status_color = "#fb923c" if "Active" in status_label else "#6366f1"
         
-        st.divider()
+        st.markdown("""
+<div style="
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+">
+    <div style="
+        background-color: #252525;
+        border: 1px solid #3d3d3d;
+        border-radius: 10px;
+        padding: 0.75rem;
+        text-align: center;
+    ">
+        <div style="font-size: 1.5rem; font-weight: 700; color: #6366f1;">{}</div>
+        <div style="font-size: 0.7rem; color: #9ca3af; margin-top: 0.25rem;">TICKETS</div>
+    </div>
+    <div style="
+        background-color: #252525;
+        border: 1px solid #3d3d3d;
+        border-radius: 10px;
+        padding: 0.75rem;
+        text-align: center;
+    ">
+        <div style="font-size: 1.5rem; font-weight: 700; color: #8b5cf6;">{}</div>
+        <div style="font-size: 0.7rem; color: #9ca3af; margin-top: 0.25rem;">MESSAGES</div>
+    </div>
+    <div style="
+        background-color: #252525;
+        border: 1px solid #3d3d3d;
+        border-radius: 10px;
+        padding: 0.75rem;
+        text-align: center;
+    ">
+        <div style="font-size: 1.5rem; font-weight: 700; color: #22c55e;">{} min</div>
+        <div style="font-size: 0.7rem; color: #9ca3af; margin-top: 0.25rem;">TIME</div>
+    </div>
+    <div style="
+        background-color: #252525;
+        border: 1px solid #3d3d3d;
+        border-radius: 10px;
+        padding: 0.75rem;
+        text-align: center;
+    ">
+        <div style="font-size: 1.5rem; font-weight: 700; color: {};">{}</div>
+        <div style="font-size: 0.7rem; color: #9ca3af; margin-top: 0.25rem;">STATUS</div>
+    </div>
+</div>
+        """.format(
+            st.session_state.tickets_submitted,
+            len(st.session_state.messages),
+            minutes,
+            status_color,
+            status_label
+        ), unsafe_allow_html=True)
         
-        # Knowledge Base Status
-        st.subheader("📚 Knowledge Base")
-        if "✓" in st.session_state.kb_status:
-            st.success(st.session_state.kb_status)
-        else:
-            st.warning(st.session_state.kb_status)
+        # === KNOWLEDGE BASE STATUS ===
+        kb_connected = "✓" in st.session_state.kb_status
+        kb_icon = "✓" if kb_connected else "⚠"
+        kb_text = "Connected" if kb_connected else "Unavailable"
+        kb_bg = "rgba(34, 197, 94, 0.15)" if kb_connected else "rgba(251, 146, 60, 0.15)"
+        kb_border = "#22c55e" if kb_connected else "#fb923c"
         
-        st.divider()
+        st.markdown("""
+<div style="
+    background: {};
+    border: 1px solid {};
+    border-radius: 10px;
+    padding: 0.75rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+">
+    <div style="font-size: 0.7rem; color: #9ca3af; margin-bottom: 0.25rem;">KNOWLEDGE BASE</div>
+    <div style="font-size: 0.9rem; font-weight: 600; color: #f9fafb;">{} {}</div>
+</div>
+        """.format(kb_bg, kb_border, kb_icon, kb_text), unsafe_allow_html=True)
         
-        # Registered Devices
-        with st.expander("💻 Your Devices"):
-            for device in st.session_state.user_devices:
-                st.write(f"• {device}")
+        # === DEVICES SECTION ===
+        st.markdown("""
+<div style="
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+    padding-left: 0.25rem;
+">💻 Your Devices</div>
+        """, unsafe_allow_html=True)
         
-        st.divider()
+        with st.expander("🔽 View All Devices", expanded=False):
+            for idx, device in enumerate(st.session_state.user_devices):
+                icon = "🖥️" if any(x in device for x in ["Dell", "HP", "MacBook"]) else ("📱" if any(x in device for x in ["iPad", "iPhone"]) else "🖨️")
+                st.markdown(f"""
+<div style="
+    background-color: #252525;
+    border: 1px solid #3d3d3d;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+    color: #e5e7eb;
+">
+    {icon} {device}
+</div>
+                """, unsafe_allow_html=True)
         
-        # Actions
-        if st.button("🔄 New Session", use_container_width=True):
-            # Reset session
+        # === ACTIONS ===
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔄 New Session", use_container_width=True, type="primary"):
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
             st.rerun()
         
-        # Info
-        st.divider()
-        st.caption("💡 **Tip:** Describe your issue and I'll help troubleshoot or create a ticket!")
+        # === DEVELOPER DEBUG ===
+        with st.expander("🛠️ Debug", expanded=False):
+            st.json(st.session_state.agent_state)
 
 
 def render_chat():
     """Render the main chat interface"""
-    st.title("🤖 OF IT Support Chatbot")
+    # Glowing title with special OF emphasis
+    st.markdown("""
+<div style="text-align: center; margin-bottom: 1rem;">
+    <h1 style="
+        margin: 0;
+        padding: 0;
+        font-size: 2rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+    ">
+        <span style="
+            display: inline-block;
+            background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 0 20px rgba(249, 115, 22, 0.6)) drop-shadow(0 0 40px rgba(245, 158, 11, 0.4));
+            animation: glow 2s ease-in-out infinite alternate;
+            font-weight: 800;
+        ">OF</span>
+        <span style="
+            color: #e5e7eb;
+            margin-left: 0.5rem;
+        ">IT Support Chatbot</span>
+    </h1>
+</div>
+<style>
+    @keyframes glow {
+        from {
+            filter: drop-shadow(0 0 15px rgba(249, 115, 22, 0.5)) drop-shadow(0 0 30px rgba(245, 158, 11, 0.3));
+        }
+        to {
+            filter: drop-shadow(0 0 25px rgba(249, 115, 22, 0.8)) drop-shadow(0 0 50px rgba(245, 158, 11, 0.6));
+        }
+    }
+</style>
+    """, unsafe_allow_html=True)
     st.caption("Powered by Multi-Agent AI System | LangGraph + GPT-4")
+    st.markdown("<br>", unsafe_allow_html=True)
     
     # Welcome message if no messages
     if not st.session_state.messages:
-        st.info("""
-**👋 Welcome to IT Support!**
-
-I'm here to help with your technical issues. I can:
-- 🔍 Search our knowledge base for solutions
-- 🛠️ Guide you through troubleshooting steps  
-- 🎫 Create support tickets if needed
-
-**Just describe your problem to get started!**
-        """)
-        
-        # Show KB status prominently
-        if "✓" in st.session_state.kb_status:
-            st.success(f"Knowledge Base: {st.session_state.kb_status}")
-        else:
-            st.warning(f"Knowledge Base: {st.session_state.kb_status}")
+        st.markdown("""
+<div style="
+    background-color: #252525;
+    padding: 2rem;
+    border-radius: 16px;
+    border: 1px solid #3d3d3d;
+    margin: 2rem 0;
+    text-align: center;
+">
+    <h2 style="margin-top: 0; color: #f9fafb; font-size: 1.5rem;">👋 Welcome!</h2>
+    <p style="line-height: 1.8; color: #9ca3af; margin-bottom: 1.5rem; font-size: 0.95rem;">
+        I'm your AI-powered IT assistant, ready to help with your technical issues.
+    </p>
+    <div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; margin-top: 1.5rem;">
+        <div style="flex: 1; min-width: 150px; max-width: 200px;">
+            <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🔍</div>
+            <div style="color: #e5e7eb; font-size: 0.85rem;">Search KB</div>
+        </div>
+        <div style="flex: 1; min-width: 150px; max-width: 200px;">
+            <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🛠️</div>
+            <div style="color: #e5e7eb; font-size: 0.85rem;">Troubleshoot</div>
+        </div>
+        <div style="flex: 1; min-width: 150px; max-width: 200px;">
+            <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🎫</div>
+            <div style="color: #e5e7eb; font-size: 0.85rem;">Create Tickets</div>
+        </div>
+    </div>
+    <p style="margin-top: 1.5rem; margin-bottom: 0; color: #6366f1; font-weight: 500; font-size: 0.9rem;">
+        Describe your problem to get started
+    </p>
+</div>
+        """, unsafe_allow_html=True)
     
     # Chat messages container
     chat_container = st.container()
