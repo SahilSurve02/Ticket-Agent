@@ -76,10 +76,16 @@ def ticket_preview_node(state: AgentState):
         for field_name, value in current_ticket.extra_fields.items():
             # Convert field_name to readable label
             label = field_name.replace("_", " ").title()
-            extra_display += f"**{label}:** {value}\\n"
+            extra_display += f"**{label}:** {value}  \n"
     
-    # Format description nicely
+    # Format description nicely (ensure proper newlines)
     description = current_ticket.description or "None"
+    if description != "None":
+        # Replace escaped newlines with actual newlines for proper markdown rendering
+        description = description.replace('\\n', '\n')
+    
+    # Get device name (ensure it's a string)
+    device_name = str(current_ticket.device_id) if current_ticket.device_id else "Not provided"
     
     preview = f"""
 📋 **Ticket Preview**
@@ -93,10 +99,9 @@ def ticket_preview_node(state: AgentState):
 ### 🎫 Issue Details
 **Category:** {template['name']}  
 **Issue Summary:** {current_ticket.issue_summary or "Not provided"}  
-**Device:** {current_ticket.device_id or "Not provided"}  
+**Device:** {device_name}  
 **Priority:** {current_ticket.priority or "Medium"}  
-{extra_display}
-**Description:**  
+{extra_display}**Description (AI-Generated):**  
 {description}
 
 **Options:**

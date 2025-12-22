@@ -181,5 +181,38 @@
     "priority": "High",
     "description": "User reported inability to connect Dell laptop to WiFi. Troubleshooting steps attempted included verifying credentials, forgetting and reconnecting to the network, checking Active Directory account status, confirming device domain-join, and updating security certificates. Outcome: Issue remains unresolved. Further assistance required.",
     "extra_fields": {}
+  },
+  {
+    "ticket_id": "TKT-F5D8EAB7",
+    "created_at": "2025-12-22 11:19:23",
+    "user_id": "EMP-12345",
+    "user_name": "Krishna Ronaldo",
+    "email": "krishna.ronaldo@company.com",
+    "phone": "+1-777-0123",
+    "department": "Engineering",
+    "category": "Network",
+    "issue_summary": "Dell Laptop wifi connectivity issue",
+    "device_id": "Dell Latitude 5420",
+    "priority": "Low",
+    "description": "Ticket Description: User reported WiFi connectivity issues on a Dell laptop. Troubleshooting steps included confirming the type of connection and checking for error messages. Outcome: Further investigation required as no specific errors were identified.",
+    "extra_fields": {
+      "connection_type": "Wifi",
+      "error_message": "N/A"
+    }
+  },
+  {
+    "ticket_id": "TKT-E9167424",
+    "created_at": "2025-12-22 11:24:30",
+    "user_id": "EMP-12345",
+    "user_name": "Krishna Ronaldo",
+    "email": "krishna.ronaldo@company.com",
+    "phone": "+1-777-0123",
+    "department": "Engineering",
+    "category": "General",
+    "issue_summary": "MacBook running very slow",
+    "device_id": "MacBook Pro",
+    "priority": "High",
+    "description": "Ticket Description: User reported that their MacBook is running very slow. Troubleshooting steps attempted include closing unused applications, freeing up disk space, restarting the device, and checking Activity Monitor. The performance issue persists despite these efforts.",
+    "extra_fields": {}
   }
 ]

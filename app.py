@@ -847,13 +847,23 @@ def render_message_with_buttons(content: str, message_key: str):
                     st.markdown(f"**{key}:** {val}")
         
         # Description (if exists)
-        if 'Description (AI-Generated)' in preview_content:
+        if 'Description (AI-Generated)' in preview_content or '**Description:**' in preview_content:
             st.divider()
             st.markdown("#### 📝 Description")
+            # Try both variations
             desc_start = preview_content.find('**Description (AI-Generated):**')
+            if desc_start == -1:
+                desc_start = preview_content.find('**Description:**')
             if desc_start != -1:
-                desc_text = preview_content[desc_start:].replace('**Description (AI-Generated):**', '').strip()
-                st.markdown(desc_text)
+                # Extract description text properly
+                desc_text = preview_content[desc_start:]
+                desc_text = desc_text.replace('**Description (AI-Generated):**', '').replace('**Description:**', '').strip()
+                # Remove any trailing options text
+                if '**Options:**' in desc_text:
+                    desc_text = desc_text.split('**Options:**')[0].strip()
+                # Display the description
+                if desc_text and desc_text != 'None':
+                    st.markdown(desc_text)
         
         st.divider()
         st.markdown("### What would you like to do?")

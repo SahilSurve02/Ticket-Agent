@@ -40,6 +40,34 @@ class ChatbotAgent:
         user_message = messages[-1].content if messages else ""
         awaiting_ticket_confirmation = state.get("awaiting_ticket_confirmation", False)
         
+        # Step 0: Validate IT scope (only for new user messages, not for confirmations)
+        if not awaiting_ticket_confirmation and messages:
+            # Check if this is a new user query (not a follow-up to existing conversation)
+            # Skip scope check if we're deep in conversation (more than 2 messages)
+            if len(messages) <= 2:  # First or second message
+                is_in_scope = self._check_it_scope(user_message)
+                
+                if not is_in_scope:
+                    out_of_scope_msg = """I'm a general chatbot assistant that can help with conversations and IT support.
+
+However, your request appears to be for a different service (like travel booking, food delivery, shopping, etc.) that I'm not equipped to handle.
+
+I can help you with:
+• General questions and conversation
+• IT support (password issues, software problems, hardware issues)
+• Network connectivity (WiFi, VPN)
+• Email and account access
+
+Feel free to ask me anything else!"""
+                    
+                    print(f"[ChatbotAgent] Request is out of scope, declining gracefully")
+                    return {
+                        "messages": [AIMessage(content=out_of_scope_msg)],
+                        "awaiting_ticket_confirmation": False,
+                        "wants_ticket": False,
+                        "detected_category": "OUT_OF_SCOPE"
+                    }
+        
         # Handle ticket creation confirmation
         if awaiting_ticket_confirmation:
             response_lower = user_message.lower().strip()
@@ -134,17 +162,25 @@ class ChatbotAgent:
         # Check if user is reporting solution didn't work (ambiguous feedback)
         is_ambiguous_feedback = self._is_ambiguous_feedback(user_message, messages)
         
-        # Check if user explicitly wants a ticket
-        wants_ticket = any(word in user_message.lower() for word in [
+        # Check if user EXPLICITLY wants a ticket (not just describing a problem)
+        # Only match specific ticket-related phrases, NOT general problem descriptions
+        wants_ticket_explicit = any(phrase in user_message.lower() for phrase in [
             "create ticket", "file ticket", "submit ticket", "open ticket", 
-            "ticket", "escalate", "need help", "didn't work", "doesn't work",
-            "not working", "still broken", "still issue", "not fixed"
+            "create a ticket", "file a ticket", "open a ticket",
+            "escalate", "escalate this", "raise a ticket", "log a ticket"
         ])
         
-        print(f"[ChatbotAgent] Ambiguous feedback: {is_ambiguous_feedback}, Wants ticket: {wants_ticket}")
+        # Check if solution didn't work (user already tried KB solution)
+        solution_failed = any(phrase in user_message.lower() for phrase in [
+            "didn't work", "doesn't work", "didn't help", "doesn't help",
+            "still broken", "still not working", "still issue", "not fixed",
+            "still have the problem", "still having", "tried that", "already tried"
+        ]) and len(messages) > 2  # Only if conversation has progressed
         
-        # If user gives ambiguous feedback or explicitly wants ticket -> ASK FIRST
-        if is_ambiguous_feedback or wants_ticket:
+        print(f"[ChatbotAgent] Ambiguous feedback: {is_ambiguous_feedback}, Wants ticket: {wants_ticket_explicit}, Solution failed: {solution_failed}")
+        
+        # If user gives ambiguous feedback, explicitly wants ticket, OR solution failed -> ASK
+        if is_ambiguous_feedback or wants_ticket_explicit or solution_failed:
             msg = "Would you like me to create a support ticket for this issue? I can help you file it with our support team. (yes/no)"
             print(f"[ChatbotAgent] Asking user for ticket confirmation")
             return {
@@ -192,6 +228,59 @@ class ChatbotAgent:
             "kb_used": kb_results["found"],
             "kb_confidence": kb_results.get("confidence", "none")
         }
+    
+    def _check_it_scope(self, user_message: str) -> bool:
+        """
+        Validate if the user request is clearly in OTHER domains (not IT or general conversation).
+        Returns True if the request should be processed, False if it's clearly other-domain.
+        
+        This is a GENERAL CHATBOT with IT support capabilities, so we should:
+        - ALLOW: General conversation, greetings, unclear requests, IT questions
+        - REJECT: Only clearly other-domain requests (travel, food, shopping, etc.)
+        """
+        system_prompt = """You are a domain classifier for a general-purpose chatbot with IT support capabilities.
+
+This chatbot CAN handle:
+- General conversation (greetings, small talk, questions)
+- IT support (password resets, software issues, hardware problems, network, email)
+- Unclear or ambiguous requests (give benefit of the doubt)
+
+This chatbot should ONLY REJECT requests that are clearly in OTHER SPECIFIC DOMAINS:
+- Travel and transportation (booking flights, trains, buses, taxis, hotels)
+- Food services (ordering pizza, restaurant reservations, food delivery)
+- Shopping and e-commerce (buying products, tracking packages)
+- Entertainment bookings (movie tickets, concert tickets, event tickets)
+- Professional services (doctor appointments, legal advice, financial services)
+
+IMPORTANT RULES:
+- Greetings and casual conversation → ALLOW (respond "YES")
+- Unclear or ambiguous requests → ALLOW (respond "YES")
+- IT support questions → ALLOW (respond "YES")
+- General questions → ALLOW (respond "YES")
+- ONLY clearly other-domain service requests → REJECT (respond "NO")
+
+Analyze the user's message and respond with ONLY one word:
+- "YES" if it should be processed (general chat OR IT support)
+- "NO" ONLY if it's clearly a request for OTHER domain services (travel, food, shopping, etc.)
+
+When in doubt, respond "YES"."""
+        
+        try:
+            response = self.llm.invoke([
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=f"User request: {user_message}")
+            ])
+            
+            result = response.content.strip().upper()
+            is_it_related = "YES" in result
+            
+            print(f"[ChatbotAgent] Scope check: '{user_message[:50]}...' -> {result} (IT-related: {is_it_related})")
+            return is_it_related
+            
+        except Exception as e:
+            print(f"[ChatbotAgent] Scope check error: {e}, defaulting to True")
+            # On error, default to allowing the request (fail-open)
+            return True
     
     def _is_ambiguous_feedback(self, user_message: str, messages: List) -> bool:
         """

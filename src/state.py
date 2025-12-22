@@ -50,6 +50,11 @@ FORM_TEMPLATES = {
             "affected_action": "What action is not working?\n  • Sending emails\n  • Receiving emails\n  • Both\n  • Other (calendar, contacts, etc.)"
         }
     },
+    "OUT_OF_SCOPE": {
+        "name": "Out of Scope Request",
+        "extra_fields": [],
+        "field_prompts": {}
+    },
     "General": {
         "name": "General IT Issue",
         "extra_fields": [],

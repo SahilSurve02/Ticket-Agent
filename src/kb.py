@@ -286,6 +286,30 @@ def detect_category(message: str) -> Optional[str]:
     """Detect issue category from user message - returns category matching KB and form templates"""
     message_lower = message.lower()
     
+    # Only flag CLEARLY other-domain requests (need strong contextual indicators)
+    # These require specific action verbs + domain keywords to avoid false positives
+    out_of_scope_patterns = [
+        # Travel (with action verbs)
+        ("book", ["flight", "bus", "train", "ticket to", "hotel"]),
+        ("reserve", ["flight", "hotel", "taxi"]),
+        ("i want", ["bus ticket", "train ticket", "flight to"]),
+        ("need", ["bus ticket", "train ticket", "flight to"]),
+        # Food (with action verbs)
+        ("order", ["pizza", "food", "lunch", "dinner"]),
+        ("book", ["restaurant", "table"]),
+        # Shopping (with action verbs)
+        ("buy", ["from amazon", "online", "product"]),
+        ("purchase", ["laptop from", "phone from"]),
+        # Entertainment tickets
+        ("book", ["movie ticket", "concert ticket"]),
+        ("tickets for", ["movie", "concert", "show"]),
+    ]
+    
+    for action, domain_keywords in out_of_scope_patterns:
+        if action in message_lower:
+            if any(keyword in message_lower for keyword in domain_keywords):
+                return "OUT_OF_SCOPE"
+    
     # Categories now match KB and form templates
     categories = {
         "Network": ["wifi", "wireless", "internet", "connection", "network", "router", "vpn", "ethernet", "connected"],

@@ -1,62 +1,124 @@
-# Ticket-Agent Architecture Overview
+# Architecture Documentation
 
-This document provides a detailed overview of the `Ticket-Agent` repository, its architecture, and recommendations for improvement.
+This document provides a detailed explanation of the internal architecture of the Ticket Agent system.
 
-## What does this repository do?
+## High-Level Overview
 
-This repository contains a sophisticated, multi-agent IT Support Chatbot built with LangGraph. The primary purpose of this application is to automate the initial stages of IT support. It functions as a "first line of defense" that can either solve user problems by providing relevant information from a knowledge base or, if a solution isn't found, guide the user through creating a detailed and well-structured support ticket.
+The application is a sophisticated, multi-agent chatbot built using the `langgraph` library. The entire user interaction is modeled as a state machine, or a `StateGraph`, where each step in the conversation is a "node" and the transitions between these steps are governed by "edges."
 
-The system is designed to be run from the command line and simulates a conversation with an IT support agent.
+The core of the system is a central `AgentState` dictionary that acts as a shared memory or "data bus" for all components. This state is passed from node to node, allowing different parts of the system to access conversation history, the ticket being created, and various control flags.
 
-## Architecture
+The intelligence of the system is divided between two specialized agents:
 
-The system is built as a stateful graph using the LangGraph library. This architecture allows for a robust and predictable flow of conversation, where different "nodes" in the graph are responsible for specific tasks. The core components of the architecture are:
+1.  **ChatbotAgent (Triage & First Response):** This is the user's first point of contact. It uses a Retrieval-Augmented Generation (RAG) pipeline to search a knowledge base (`data/kb.json`) for solutions to the user's problem. If it cannot find a solution, it initiates a handoff to the TicketAgent.
+2.  **TicketAgent (Data Collection):** This agent takes over to create a formal support ticket. It is a methodical, form-filling agent that guides the user through the data collection process step-by-step, using predefined templates for different ticket categories (e.g., "Software," "Hardware").
 
-1.  **Stateful Graph (`main.py`):** The entire application is orchestrated by a `StateGraph` defined in `main.py`. This graph defines the possible states and transitions in the conversation. The state is managed by the `AgentState` TypedDict (`src/state.py`), which acts as the shared memory for the entire system.
+Control flow (the movement between nodes) is managed by routers, which can be simple rule-based functions or a more advanced `HybridRouter` that uses a Large Language Model (LLM) to understand the user's intent.
 
-2.  **Nodes (`src/nodes.py`):** Each node in the graph represents a step in the process. The key nodes are:
-    *   `chatbot_node`: The entry point for user interaction.
-    *   `ticket_collection_node`: Gathers information for a support ticket.
-    *   `ticket_preview_node`: Shows the user a preview of the ticket before submission.
-    *   `submit_ticket_node`: The final step, which (currently) prints the ticket details.
+## The User's Journey: Filing a Ticket
 
-3.  **Conditional Routing (`main.py`):** The graph uses conditional edges (`route_chatbot`, `route_ticket_collection`) to make decisions. For example, after the `chatbot_node` runs, `route_chatbot` checks if a solution was found. If so, the conversation can end. If not, it routes the conversation to the `ticket_collection_node`.
+The following steps outline a typical user journey from starting a conversation to successfully filing a ticket.
 
-4.  **Retrieval-Augmented Generation (RAG) (`src/kb.py`, `src/agents.py`):** The `ChatbotAgent` uses a RAG pipeline to answer user queries.
-    *   **Knowledge Base:** The knowledge base is stored in `data/kb.json`.
-    *   **Vector Store:** On startup, the knowledge base is loaded into a ChromaDB vector store (`src/kb.py`).
-    *   **Search:** When a user sends a message, the system searches the vector store for relevant solutions (`search_knowledge` in `src/kb.py`).
+1.  **Initial Interaction (Chatbot Node):**
+    *   The user sends their initial message (e.g., "My printer is not working").
+    *   The `chatbot_node` is activated. It delegates the work to the `ChatbotAgent`.
+    *   The `ChatbotAgent` searches the knowledge base for relevant solutions.
+    *   If a solution is found, it's presented to the user. The user can either confirm that the issue is resolved or state that they still need help.
+    *   If no solution is found, or if the user indicates they still need help, the agent decides a ticket is necessary and initiates a "handoff."
 
-## Is this a single-agent or multi-agent system?
+2.  **Routing from Chatbot:**
+    *   After the chatbot node, a router (`route_chatbot_rules`) inspects the `AgentState`.
+    *   If the state indicates a handoff is required (`handoff_to_ticket_agent` is `True`), the router directs the flow to the `ticket_collection_node`.
+    *   Otherwise, the flow loops back to the `chatbot_node` for continued conversation.
 
-This is a **multi-agent system**. The agents have clearly separated roles and responsibilities, which makes the system modular and easier to maintain.
+3.  **Ticket Collection (Ticket Collection Node):**
+    *   The `ticket_collection_node` is activated, which delegates to the `TicketAgent`.
+    *   The `TicketAgent` first identifies the ticket category (e.g., "Hardware") and then uses a predefined template (`FORM_TEMPLATES` from `src/state.py`) to determine what information it needs to collect (e.g., "asset_id", "priority").
+    *   It asks the user for one piece of information at a time (e.g., "What is the asset ID of the printer?").
+    *   The user's responses are collected and stored in the `TicketSchema` object within the `AgentState`.
 
-## If multi-agent, how are they working?
+4.  **Routing During Ticket Collection:**
+    *   After each user response in the ticket collection phase, the `route_ticket_collection` router checks if all required information for the current template has been gathered.
+    *   If more information is needed, it routes back to the `ticket_collection_node`.
+    *   Once all fields are filled, it sets `ticket_collection_complete` to `True` and routes the flow to the `ticket_preview_node`.
 
-The system has two primary agents defined in `src/agents.py`:
+5.  **Ticket Preview (Ticket Preview Node):**
+    *   The `ticket_preview_node` is activated.
+    *   It displays a summary of the collected ticket information to the user and asks for confirmation ("Does this look correct?").
 
-1.  **`ChatbotAgent` (The "Triage Specialist"):**
-    *   **Responsibility:** Handles the initial user interaction, understands the user's problem, and tries to find a solution.
-    *   **Function:** It takes the user's query and uses the `search_knowledge` function to query the RAG pipeline. It then uses a language model to determine if any of the retrieved solutions are relevant. It's also responsible for the "handoff" detection, deciding when it's time to stop searching for solutions and start creating a ticket.
+6.  **Routing from Preview (Confirmation):**
+    *   The `route_preview` router analyzes the user's response.
+    *   **If the user confirms ("yes"):** It routes to the `submit_ticket_node`.
+    *   **If the user wants to make a change ("no", "I need to change the priority"):** It routes back to the `ticket_collection_node`. The `TicketAgent` is smart enough to handle edit requests (e.g., "change the priority to High") and will update the specific field before asking for confirmation again.
+    *   **If the user cancels:** It routes to an `end_node`.
 
-2.  **`TicketAgent` (The "Administrator"):**
-    *   **Responsibility:** Manages the structured task of creating a support ticket.
-    *   **Function:** Once the system transitions to ticket creation, the `TicketAgent` takes over. It uses predefined `FORM_TEMPLATES` (`src/state.py`) based on the detected category of the problem (e.g., "General IT," "Software," "Hardware"). It then interacts with the user in a form-like manner to collect all the necessary information (e.g., "What is the asset ID of your device?").
+7.  **Ticket Submission (Submit Ticket Node):**
+    *   The `submit_ticket_node` is activated.
+    *   It takes the final `TicketSchema` object from the state.
+    *   It assigns a unique `ticket_id` and a `timestamp`.
+    *   It saves the complete ticket as a JSON object to the `data/tickets.json` file.
+    *   It then moves to the `ticket_confirmation_node`.
 
-The agents do not act autonomously in parallel. Instead, they are called by the LangGraph framework in a predefined, state-driven flow. This ensures a predictable and robust user experience. The `StateGraph` in `main.py` explicitly defines when each agent (via its corresponding node) is activated.
+8.  **Final Confirmation (Ticket Confirmation Node):**
+    *   The `ticket_confirmation_node` provides the user with their final ticket ID and a confirmation message. The process is now complete.
 
-## Recommendations for Improvement
+## Component Breakdown
 
-1.  **Implement Real Ticket Submission:** The `submit_ticket_node` currently only prints the ticket data to the console. This should be integrated with a real ticketing system like **Jira, ServiceNow, or Zendesk** via an API call.
+### Entrypoints: `main.py` and `app.py`
 
-2.  **Dynamic KB Management:** The knowledge base is a static `kb.json` file. This is not ideal for a real-world scenario. A significant improvement would be to create a simple web interface or a set of scripts for IT staff to add, remove, and update knowledge base articles without needing to modify code or restart the application.
+*   **Role:** These files are the entry points for the command-line interface and the Streamlit web UI, respectively.
+*   **Functionality:** Both files are responsible for:
+    1.  Initializing the `StateGraph`.
+    2.  Adding all the nodes (`chatbot`, `ticket_collection`, etc.).
+    3.  Defining the conditional edges (the routing logic) that connect the nodes.
+    4.  Compiling the graph into a runnable `workflow` object.
+    5.  Running the main application loop.
+*   **Architectural Note:** The graph definition is unfortunately duplicated across both files. A key improvement would be to centralize this graph-building logic into a single function that both `main.py` and `app.py` can import and use.
 
-3.  **Add a Web Interface:** The project includes FastAPI in its requirements, but it's only run from the command line. Building out the API endpoints and creating a proper web-based chat interface would make the application much more user-friendly.
+### State: `src/state.py`
 
-4.  **Comprehensive Testing:** The project lacks any form of automated testing. Adding **unit tests** for the agent logic (`src/agents.py`) and **integration tests** for the LangGraph workflow (`main.py`) is crucial for ensuring the application is stable and maintainable in the long term.
+*   **Role:** This is the data-centric heart of the application. It defines the structure of the shared memory (`AgentState`) that is passed between all nodes in the graph.
+*   **Key Components:**
+    *   `TicketSchema`: A `Pydantic` model that defines the structure of a support ticket (e.g., `title`, `category`, `priority`, `description`). This ensures data consistency.
+    *   `AgentState`: A `TypedDict` that represents the entire state of the application at any given moment. It includes:
+        *   `messages`: The history of the conversation.
+        *   `ticket`: The `TicketSchema` object being built.
+        *   `form_to_fill`: The current template being used by the `TicketAgent`.
+        *   Control flags like `handoff_to_ticket_agent` and `ticket_collection_complete`.
+    *   `FORM_TEMPLATES`: A dictionary that maps ticket categories to the list of fields that need to be collected. This makes the system easily extensible to new ticket types.
 
-5.  **Configuration Management:** Hardcoded values like model names (`gpt-4o-mini`) and prompts should be externalized into a configuration file (e.g., `config.yaml` or `.env`). This makes the application more flexible and easier to configure for different environments.
+### Nodes: `src/nodes.py`
 
-6.  **Establish a Feedback Loop:** The system could be enhanced by asking the user if the provided solution from the knowledge base was helpful. This feedback could be logged and used to create a feedback loop to automatically improve the ranking of solutions or flag articles that are not useful for review.
+*   **Role:** This file contains the implementation for every "step" or "state" in our workflow graph.
+*   **Functionality:** Each function in this file corresponds to a node in the graph. The primary responsibility of most nodes is to call the appropriate agent (`ChatbotAgent` or `TicketAgent`) to perform the actual work and then update the `AgentState` with the results.
+    *   `chatbot_node`: Calls the `ChatbotAgent`.
+    *   `ticket_collection_node`: Calls the `TicketAgent`.
+    *   `ticket_preview_node`: Formats the ticket data for user review.
+    *   `submit_ticket_node`: Saves the ticket to the filesystem.
+    *   `ticket_confirmation_node`: Generates the final confirmation message.
 
-7.  **More Sophisticated State Management:** For more complex scenarios, the `AgentState` could be expanded to track more context, such as user sentiment or a more detailed history of attempted solutions.
+### Agents: `src/agents.py`
+
+*   **Role:** This file contains the core intelligence and decision-making logic of the system.
+*   **Key Components:**
+    *   `ChatbotAgent`:
+        *   **Purpose:** Triage and initial support.
+        *   **How it works:** It uses `langchain` tools, including the `KnowledgeBase` (`src/kb.py`), to search for solutions. It is prompted to be helpful and conversational, but also to recognize when it cannot solve a problem and must escalate to creating a ticket.
+    *   `TicketAgent`:
+        *   **Purpose:** Structured data collection.
+        *   **How it works:** This agent is prompted to be more methodical. It receives the current conversation and the `form_to_fill` template. Its job is to either ask the next unanswered question from the template or, if the user is making an edit, to parse that edit request and update the ticket accordingly.
+
+### Router: `src/router.py`
+
+*   **Role:** This file defines the logic for controlling the flow of the conversation. It implements the "conditional edges" of our `StateGraph`.
+*   **Functionality:**
+    *   **Rule-Based Routers (e.g., `route_chatbot_rules`):** These are simple Python functions that use `if/else` statements to check for boolean flags in the `AgentState` (e.g., `if state['handoff_to_ticket_agent']:`). They are fast and deterministic.
+    *   **LLM-Based Routers (`HybridRouter`, `LLMRouter`):** This provides a more advanced and flexible routing mechanism. The `HybridRouter` first checks a set of deterministic rules. If no rule matches, it falls back to the `LLMRouter`, which sends the conversation history to an LLM. The LLM is prompted to analyze the user's intent and decide which node the conversation should move to next. This allows for more natural conversation, as the user doesn't have to use specific keywords.
+
+### Knowledge Base: `src/kb.py`
+
+*   **Role:** Implements the Retrieval-Augmented Generation (RAG) functionality.
+*   **Functionality:**
+    *   **`KnowledgeBase` class:** Manages the interaction with a `ChromaDB` vector store.
+    *   **`initialize_kb_with_check`:** Checks if the knowledge base (`data/kb.json`) has already been processed and stored in `ChromaDB`. If not, it embeds the JSON data using `OpenAIEmbeddings` and saves it. This prevents re-processing the data on every run.
+    *   **`get_best_solution`:** The core retrieval function. It takes a user's query, embeds it, and performs a similarity search against the vector database to find the most relevant solutions from the knowledge base.
