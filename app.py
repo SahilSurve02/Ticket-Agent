@@ -1250,14 +1250,10 @@ def render_chat():
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            filter: drop-shadow(0 0 20px rgba(249, 115, 22, 0.6)) drop-shadow(0 0 40px rgba(245, 158, 11, 0.4));
+            filter: drop-shadow(0 0 20px rgba(222, 115, 22, 0.6)) drop-shadow(0 0 40px rgba(145, 158, 11, 0.4));
             animation: glow 2s ease-in-out infinite alternate;
             font-weight: 800;
-        ">OF</span>
-        <span style="
-            color: #e5e7eb;
-            margin-left: 0.5rem;
-        ">IT Support Chatbot</span>
+        ">OF IT Support Chatbot</span>
     </h1>
 </div>
 <style>
@@ -1271,8 +1267,8 @@ def render_chat():
     }
 </style>
     """, unsafe_allow_html=True)
-    st.caption("Powered by Multi-Agent AI System | LangGraph + GPT-4")
-    st.markdown("<br>", unsafe_allow_html=True)
+    # st.caption("Powered by Multi-Agent AI System | LangGraph + GPT-4")
+    # st.markdown("<br>", unsafe_allow_html=True)
     
     # Welcome message if no messages
     if not st.session_state.messages:
@@ -1386,9 +1382,9 @@ def main():
     
     # Footer
     st.divider()
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.caption("🔒 Secure | 🚀 Fast | 🎯 Intelligent")
+    # col1, col2, col3 = st.columns([1, 2, 1])
+    # with col2:
+    #     st.caption("🔒 Secure | 🚀 Fast | 🎯 Intelligent")
 
 
 if __name__ == "__main__":
