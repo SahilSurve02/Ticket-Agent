@@ -238,7 +238,7 @@ def run_chat():
     # Initial state
     initial_input = {
         "user_info": user_info,
-        "user_devices": ["Dell Latitude 5420"],
+        "user_devices": ["Dell Latitude 5420", "iPad Pro", "iPhone 14", "MacBook Pro", "HP Printer LaserJet 200"],
         "ticket": create_empty_ticket(),
         "ticket_preview_shown": False,
         "awaiting_confirmation": False,

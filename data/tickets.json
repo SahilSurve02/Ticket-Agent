@@ -349,5 +349,23 @@
       "component": "Other",
       "physical_damage": "N/A"
     }
+  },
+  {
+    "ticket_id": "TKT-F0D4CF63",
+    "created_at": "2025-12-22 19:00:14",
+    "user_id": "EMP-12345",
+    "user_name": "Krishna Ronaldo",
+    "email": "krishna.ronaldo@company.com",
+    "phone": "+1-777-0123",
+    "department": "Engineering",
+    "category": "Hardware",
+    "issue_summary": "Laptop is getting slow",
+    "device_id": "MacBook Pro",
+    "priority": "Medium",
+    "description": "Ticket Description: User reported that their MacBook Pro is experiencing slow performance. Troubleshooting steps included checking Task Manager for resource usage, closing unnecessary programs, running Disk Cleanup, scanning for malware, disabling startup programs, and restarting the device. User indicated partial improvement. Further assistance may be required.",
+    "extra_fields": {
+      "component": "Other",
+      "physical_damage": "N/A"
+    }
   }
 ]
