@@ -316,5 +316,38 @@
     "priority": "High",
     "description": "User reported the need to file a support ticket for their iPad Pro. No troubleshooting steps were attempted. Outcome: User was advised on the ticket submission process.",
     "extra_fields": {}
+  },
+  {
+    "ticket_id": "TKT-3EE3DFEC",
+    "created_at": "2025-12-22 16:36:32",
+    "user_id": "EMP-12345",
+    "user_name": "Krishna Ronaldo",
+    "email": "krishna.ronaldo@company.com",
+    "phone": "+1-777-0123",
+    "department": "Engineering",
+    "category": "General",
+    "issue_summary": "File a support ticket",
+    "device_id": "iPad Pro",
+    "priority": "High",
+    "description": "User reported the need to file a support ticket for their iPad Pro. No troubleshooting steps were attempted. Outcome: User requires assistance with ticket submission.",
+    "extra_fields": {}
+  },
+  {
+    "ticket_id": "TKT-797AEEB1",
+    "created_at": "2025-12-22 17:00:24",
+    "user_id": "EMP-12345",
+    "user_name": "Krishna Ronaldo",
+    "email": "krishna.ronaldo@company.com",
+    "phone": "+1-777-0123",
+    "department": "Engineering",
+    "category": "Hardware",
+    "issue_summary": "Laptop is working slow",
+    "device_id": "Dell Latitude 5420",
+    "priority": "Medium",
+    "description": "Ticket Description: User reported that their laptop is running slow. Troubleshooting steps included checking Task Manager, closing unnecessary programs, running Disk Cleanup, scanning for malware, disabling startup programs, and restarting the computer. The issue persists, and further investigation into hardware components is needed.",
+    "extra_fields": {
+      "component": "Other",
+      "physical_damage": "N/A"
+    }
   }
 ]

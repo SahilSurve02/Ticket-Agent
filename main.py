@@ -6,6 +6,7 @@ from src.kb import initialize_kb_with_check
 from langgraph.checkpoint.memory import MemorySaver
 import uuid
 import os
+import traceback
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -237,7 +238,7 @@ def run_chat():
     # Initial state
     initial_input = {
         "user_info": user_info,
-        "user_devices": ["Dell Latitude 5420", "iPad Pro", "iPhone 14", "MacBook Pro", "HP Printer LaserJet 200"],
+        "user_devices": ["Dell Latitude 5420"],
         "ticket": create_empty_ticket(),
         "ticket_preview_shown": False,
         "awaiting_confirmation": False,
@@ -295,7 +296,7 @@ def run_chat():
         
         except Exception as e:
             print(f"\n[Error]: {e}")
-            import traceback
+            
             traceback.print_exc()
 
 
