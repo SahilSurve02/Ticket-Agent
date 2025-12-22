@@ -214,5 +214,74 @@
     "priority": "High",
     "description": "Ticket Description: User reported that their MacBook is running very slow. Troubleshooting steps attempted include closing unused applications, freeing up disk space, restarting the device, and checking Activity Monitor. The performance issue persists despite these efforts.",
     "extra_fields": {}
+  },
+  {
+    "ticket_id": "TKT-BA1E36E4",
+    "created_at": "2025-12-22 13:42:57",
+    "user_id": "EMP-12345",
+    "user_name": "Krishna Ronaldo",
+    "email": "krishna.ronaldo@company.com",
+    "phone": "+1-777-0123",
+    "department": "Engineering",
+    "category": "Software",
+    "issue_summary": "Laptop working very slow",
+    "device_id": "MacBook Pro",
+    "priority": "High",
+    "description": "Ticket Description: User reported that their MacBook is running very slow, particularly with Microsoft Teams. Troubleshooting steps included closing unnecessary programs, restarting the laptop, checking for malware, freeing up disk space, and updating the OS and drivers. Performance improved slightly, but the issue persists.",
+    "extra_fields": {
+      "application_name": "Microsoft Teams",
+      "error_code": "N/A"
+    }
+  },
+  {
+    "ticket_id": "TKT-0D0DC694",
+    "created_at": "2025-12-22 13:51:47",
+    "user_id": "EMP-12345",
+    "user_name": "Krishna Ronaldo",
+    "email": "krishna.ronaldo@company.com",
+    "phone": "+1-777-0123",
+    "department": "Engineering",
+    "category": "General",
+    "issue_summary": "Laptop running very slow",
+    "device_id": "MacBook Pro",
+    "priority": "High",
+    "description": "Ticket Description: User reported that their Dell laptop is running very slow. Troubleshooting steps attempted include closing unnecessary programs, restarting, checking for malware, freeing up disk space, disabling startup programs, updating the OS, running Disk Cleanup, checking for disk errors, adjusting power settings, and disabling visual effects. The issue persists.",
+    "extra_fields": {}
+  },
+  {
+    "ticket_id": "TKT-159B5FA8",
+    "created_at": "2025-12-22 14:00:09",
+    "user_id": "EMP-12345",
+    "user_name": "Krishna Ronaldo",
+    "email": "krishna.ronaldo@company.com",
+    "phone": "+1-777-0123",
+    "department": "Engineering",
+    "category": "Hardware",
+    "issue_summary": "Laptop working very slow",
+    "device_id": "Dell Latitude 5420",
+    "priority": "Medium",
+    "description": "Ticket Description: User reported that their Dell laptop is operating very slowly. Troubleshooting steps included checking Task Manager, closing unnecessary programs, running Disk Cleanup, scanning for malware, disabling startup programs, and restarting the device. The issue persists, requiring further investigation.",
+    "extra_fields": {
+      "component": "Other",
+      "physical_damage": "N/A"
+    }
+  },
+  {
+    "ticket_id": "TKT-33414086",
+    "created_at": "2025-12-22 15:29:23",
+    "user_id": "EMP-12345",
+    "user_name": "Krishna Ronaldo",
+    "email": "krishna.ronaldo@company.com",
+    "phone": "+1-777-0123",
+    "department": "Engineering",
+    "category": "Hardware",
+    "issue_summary": "Laptop performance issues",
+    "device_id": "Dell Latitude 5420",
+    "priority": "Low",
+    "description": "Ticket Description: User reported slow laptop performance. Troubleshooting steps included checking Task Manager, closing unnecessary programs, running Disk Cleanup, scanning for malware, disabling startup programs, and restarting the device. User indicated some improvement but did not specify affected hardware components. Further investigation may be required.",
+    "extra_fields": {
+      "component": "Other",
+      "physical_damage": "N/A"
+    }
   }
 ]

@@ -54,7 +54,12 @@ def ticket_collection_node(state: AgentState):
     """
     # Delegate to TicketAgent
     agent = get_ticket_agent()
-    return agent.process_ticket_collection(state)
+    result = agent.process_ticket_collection(state)
+    
+    # Clear the escalation flag after processing (prevent re-triggering)
+    result["escalate_to_ticket"] = False
+    
+    return result
 
 
 # =============================================================================

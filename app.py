@@ -342,7 +342,16 @@ st.markdown("""
 # =============================================================================
 
 def route_chatbot_rules(state: AgentState):
-    """Routes from chatbot based on state - Rule-based implementation"""
+    """
+    Routes from chatbot based on state - Rule-based implementation
+    
+    INDUSTRY-STANDARD: Uses structured escalate_to_ticket flag for 
+    deterministic handoff (replaces fragile string matching)
+    """
+    # STRUCTURED HANDOFF: Check flag FIRST (deterministic, reliable)
+    if state.get("escalate_to_ticket") is True:
+        return "ticket_collection"
+    
     if state.get("edit_mode"):
         return "ticket_collection"
     
@@ -360,6 +369,7 @@ def route_chatbot_rules(state: AgentState):
     if last_question in ticket_questions:
         return "ticket_collection"
     
+    # Legacy fallback: string-based detection (for backward compatibility)
     messages = state.get("messages", [])
     if messages:
         last_msg = messages[-1]

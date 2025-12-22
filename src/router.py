@@ -83,13 +83,18 @@ class LLMRouter:
         awaiting_confirmation: bool = False,
         awaiting_ticket_confirmation: bool = False,
         edit_mode: bool = False,
-        ticket_questions: List[str] = None
+        ticket_questions: List[str] = None,
+        escalate_to_ticket: bool = False  # STRUCTURED HANDOFF FLAG
     ) -> ChatbotRoute:
         """
         Intelligent routing from the chatbot node.
         
         Combines rule-based checks for deterministic states with LLM-based
         intent detection for ambiguous situations.
+        
+        INDUSTRY-STANDARD IMPROVEMENT:
+        - Uses structured `escalate_to_ticket` flag for deterministic handoff
+        - No fragile regex/string matching for escalation
         
         Args:
             messages: Conversation history
@@ -98,11 +103,13 @@ class LLMRouter:
             awaiting_ticket_confirmation: Whether we're awaiting "create ticket?" confirmation
             edit_mode: Whether user is editing ticket details
             ticket_questions: List of valid ticket form questions
+            escalate_to_ticket: STRUCTURED FLAG - True when chatbot wants to hand off
         
         Returns:
             ChatbotRoute enum value
         """
         print(f"\n[ROUTER DEBUG] route_from_chatbot called")
+        print(f"  - escalate_to_ticket: {escalate_to_ticket}")
         print(f"  - edit_mode: {edit_mode}")
         print(f"  - awaiting_confirmation: {awaiting_confirmation}")
         print(f"  - awaiting_ticket_confirmation: {awaiting_ticket_confirmation}")
@@ -112,6 +119,12 @@ class LLMRouter:
         # =====================================================================
         # RULE-BASED CHECKS (Deterministic states - these are appropriate)
         # =====================================================================
+        
+        # STRUCTURED HANDOFF: Check escalation flag FIRST (Industry Standard)
+        # This replaces fragile string matching with deterministic routing
+        if escalate_to_ticket:
+            print(f"  → ROUTE: TICKET_COLLECTION (structured escalate_to_ticket flag)")
+            return ChatbotRoute.TICKET_COLLECTION
         
         # If in edit mode, route to ticket_collection to process the edit
         if edit_mode:
@@ -147,10 +160,10 @@ class LLMRouter:
         
         last_content = last_msg.content
         
-        # Check for explicit handoff signals (from chatbot agent)
-        # This is still rule-based but checks for the agent's explicit signal
-        if "HANDOFF_TO_TICKET_AGENT" in last_content or "handoff_to_ticket" in last_content:
-            print(f"  → ROUTE: TICKET_COLLECTION (handoff signal detected)")
+        # Legacy fallback: Check for explicit handoff signals in message content
+        # (Keeping for backward compatibility, but structured flag is preferred)
+        if last_content and ("HANDOFF_TO_TICKET_AGENT" in last_content or "handoff_to_ticket" in last_content):
+            print(f"  → ROUTE: TICKET_COLLECTION (legacy handoff signal in message)")
             return ChatbotRoute.TICKET_COLLECTION
         
         # For all other cases, use LLM to detect intent
@@ -323,14 +336,15 @@ class HybridRouter:
         for template in FORM_TEMPLATES.values():
             ticket_questions.extend(template.get("extra_fields", []))
         
-        # Call the LLM router
+        # Call the LLM router with structured handoff flag
         route = self.llm_router.route_from_chatbot(
             messages=state.get("messages", []),
             last_question=state.get("last_question"),
             awaiting_confirmation=state.get("awaiting_confirmation", False),
             awaiting_ticket_confirmation=state.get("awaiting_ticket_confirmation", False),
             edit_mode=state.get("edit_mode", False),
-            ticket_questions=ticket_questions
+            ticket_questions=ticket_questions,
+            escalate_to_ticket=state.get("escalate_to_ticket", False)  # STRUCTURED FLAG
         )
         
         # Map enum to LangGraph-compatible string

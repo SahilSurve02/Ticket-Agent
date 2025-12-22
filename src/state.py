@@ -3,6 +3,7 @@ from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
 import uuid
 from datetime import datetime
+from enum import Enum
 
 # =============================================================================
 # CATEGORY-SPECIFIC FORM TEMPLATES
@@ -93,6 +94,72 @@ class TicketSchema(BaseModel):
     extra_fields: Optional[Dict[str, str]] = Field(default_factory=dict, description="Category-specific additional fields")
 
 
+# =============================================================================
+# LLM STRUCTURED OUTPUT SCHEMAS (Industry Standard)
+# =============================================================================
+
+class ExtractedTicketFields(BaseModel):
+    """
+    Pydantic schema for LLM-based semantic extraction of ticket fields.
+    Replaces brittle hardcoded phrase matching with semantic understanding.
+    """
+    category: Optional[str] = Field(
+        None, 
+        description="Issue category: Network, Account, Hardware, Software, Email, or General. Infer from context."
+    )
+    priority: Optional[str] = Field(
+        None, 
+        description="Priority level: Critical (system down, emergency), High (blocking work, urgent), Medium (affecting work), Low (can wait). Infer from urgency/impact described."
+    )
+    device_type: Optional[str] = Field(
+        None, 
+        description="Type of device mentioned: laptop, desktop, phone, printer, etc. Extract if explicitly mentioned."
+    )
+    device_brand: Optional[str] = Field(
+        None,
+        description="Brand/manufacturer if mentioned: Dell, HP, Apple, Lenovo, etc."
+    )
+    urgency_indicators: Optional[List[str]] = Field(
+        default_factory=list,
+        description="List of phrases indicating urgency: 'system down', 'can't work', 'urgent', etc."
+    )
+    confidence: float = Field(
+        default=0.5,
+        description="Confidence score 0-1 for the extraction quality"
+    )
+
+
+class ChatbotResponseAction(BaseModel):
+    """
+    Structured output schema for ChatbotAgent responses.
+    Replaces fragile string-based handoff detection with deterministic flags.
+    
+    This is the industry-standard approach:
+    - Deterministic routing via explicit flags
+    - No regex/string matching required
+    - LLM output is structured and reliable
+    """
+    response_text: str = Field(
+        description="The response message to show the user"
+    )
+    escalate_to_ticket: bool = Field(
+        default=False,
+        description="True if user should be transferred to ticket creation agent"
+    )
+    ask_ticket_confirmation: bool = Field(
+        default=False,
+        description="True if we should ask user if they want to create a ticket"
+    )
+    detected_category: Optional[str] = Field(
+        None,
+        description="Detected issue category if identifiable"
+    )
+    reasoning: Optional[str] = Field(
+        None,
+        description="Brief reasoning for the action taken (for debugging/logging)"
+    )
+
+
 def create_empty_ticket() -> dict:
     """Create an empty ticket dict with all fields initialized"""
     return {
@@ -151,3 +218,7 @@ class AgentState(TypedDict):
     current_agent: Optional[str]  # "chatbot" or "ticket"
     ticket_collection_complete: Optional[bool]  # Flag when all ticket fields collected
     edit_mode: Optional[bool]  # Flag when user is editing ticket details
+    
+    # STRUCTURED HANDOFF (Industry Standard)
+    # Replaces fragile string-based handoff detection
+    escalate_to_ticket: Optional[bool]  # Deterministic flag for ticket escalation

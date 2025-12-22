@@ -34,7 +34,15 @@ if not USE_LLM_ROUTING:
 # =============================================================================
 
 def route_chatbot_rules(state: AgentState):
-    """Routes from chatbot based on state - Rule-based implementation"""
+    """
+    Routes from chatbot based on state - Rule-based implementation
+    
+    INDUSTRY-STANDARD: Uses structured escalate_to_ticket flag for 
+    deterministic handoff (replaces fragile string matching)
+    """
+    # STRUCTURED HANDOFF: Check flag FIRST (deterministic, reliable)
+    if state.get("escalate_to_ticket") is True:
+        return "ticket_collection"
    
     # If in edit mode, route to ticket_collection to process the edit
     if state.get("edit_mode"):
@@ -58,7 +66,7 @@ def route_chatbot_rules(state: AgentState):
     if last_question in ticket_questions:
         return "ticket_collection"
     
-    # Check last message for agent handoff trigger
+    # Legacy fallback: Check last message for agent handoff trigger
     messages = state.get("messages", [])
     if messages:
         last_msg = messages[-1]

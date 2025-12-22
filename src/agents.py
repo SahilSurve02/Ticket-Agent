@@ -2,13 +2,20 @@
 Multi-Agent System for IT Support
 - ChatbotAgent: Handles troubleshooting and KB queries
 - TicketAgent: Handles ticket creation and management
+
+Industry-Standard Features:
+- LLM-based semantic entity extraction (replaces hardcoded phrase matching)
+- Structured output for deterministic handoff (replaces regex string matching)
 """
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from pydantic import BaseModel, Field
 from typing import Literal, Optional, Dict, List
-from src.state import AgentState, TicketSchema, FORM_TEMPLATES, create_empty_ticket
+from src.state import (
+    AgentState, TicketSchema, FORM_TEMPLATES, create_empty_ticket,
+    ExtractedTicketFields, ChatbotResponseAction
+)
 from src.kb import get_global_kb, get_best_solution, detect_category
 import os
 from dotenv import load_dotenv
@@ -27,12 +34,18 @@ class ChatbotAgent:
     Responsibilities:
     - Search KB for solutions
     - Provide troubleshooting steps
-    - Detect when user needs ticket escalation
+    - Detect when user needs ticket escalation (via structured output)
+    
+    Industry-Standard Features:
+    - Uses structured output (ChatbotResponseAction) for deterministic handoff
+    - No fragile string matching for escalation detection
     """
     
     def __init__(self):
         self.name = "Chatbot Agent"
         self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        # LLM with structured output for deterministic handoff decisions
+        self.structured_llm = self.llm.with_structured_output(ChatbotResponseAction)
     
     def process(self, state: AgentState) -> Dict:
         """Main processing function for chatbot agent"""
@@ -74,38 +87,38 @@ Feel free to ask me anything else!"""
             
             # User confirms ticket creation
             if any(word in response_lower for word in ["yes", "yeah", "yep", "sure", "ok", "okay", "please", "yup"]):
-                msg = "I'll transfer you to our Ticket Agent to create a support ticket.\n\nHANDOFF_TO_TICKET_AGENT"
+                msg = "I'll transfer you to our Ticket Agent to create a support ticket."
                 print(f"[ChatbotAgent] User confirmed ticket creation, handing off to TicketAgent")
-                # Try to pre-fill obvious ticket fields (device, priority) from recent conversation
+                
+                # Pre-fill ticket fields using LLM extraction (instead of hardcoded matching)
                 prefill = {}
                 try:
                     user_devices = state.get("user_devices", []) or []
-                    # Look at the last few messages for mentions
-                    convo_text = " ".join([m.content for m in messages[-3:]]).lower()
-
-                    # Detect device by matching tokens from known user devices
-                    for device in user_devices:
-                        dev_lower = device.lower()
-                        if dev_lower in convo_text or any(tok in convo_text for tok in dev_lower.split()):
-                            prefill["device_id"] = device
-                            break
-
-                    # Detect priority words or numeric choices (prefer strongest match)
-                    priority_map = {
-                        "4": "Critical", "3": "High", "2": "Medium", "1": "Low",
-                        "critical": "Critical", "system down": "Critical",
-                        "high": "High", "urgent": "High", "blocking": "High", "blocking work": "High",
-                        "medium": "Medium", "moderate": "Medium",
-                        "low": "Low", "can wait": "Low"
-                    }
-                    for key in ["system down", "critical", "urgent", "blocking work", "blocking", "high", "3", "medium", "2", "low", "1"]:
-                        if key in convo_text:
-                            prefill["priority"] = priority_map.get(key)
-                            break
-                except Exception:
+                    convo_text = " ".join([m.content for m in messages[-5:] if hasattr(m, 'content')])
+                    
+                    # CONSISTENCY FIX: Use previously detected category as a strong hint
+                    # to avoid re-detection inconsistency
+                    previously_detected_category = state.get("detected_category")
+                    
+                    # Use LLM-based extraction for semantic understanding
+                    extracted = self._extract_ticket_fields(convo_text, user_devices)
+                    if extracted:
+                        if extracted.get("device_id"):
+                            prefill["device_id"] = extracted["device_id"]
+                        if extracted.get("priority"):
+                            prefill["priority"] = extracted["priority"]
+                        # Use previously detected category if available, otherwise use extracted
+                        if previously_detected_category and previously_detected_category != "OUT_OF_SCOPE":
+                            prefill["category"] = previously_detected_category
+                            print(f"[ChatbotAgent] Using previously detected category: {previously_detected_category}")
+                        elif extracted.get("category"):
+                            prefill["category"] = extracted["category"]
+                        print(f"[ChatbotAgent] LLM extracted fields: {prefill}")
+                except Exception as e:
+                    print(f"[ChatbotAgent] Field extraction error: {e}")
                     prefill = {}
 
-                # Merge prefill into existing ticket state (dict or TicketSchema)
+                # Merge prefill into existing ticket state
                 ticket_obj = state.get("ticket") or create_empty_ticket()
                 if isinstance(ticket_obj, dict):
                     ticket_obj.update(prefill)
@@ -113,11 +126,12 @@ Feel free to ask me anything else!"""
                     try:
                         ticket_obj = ticket_obj.model_copy(update=prefill)
                     except Exception:
-                        ticket_obj = ticket_obj
+                        pass
 
                 return {
                     "messages": [AIMessage(content=msg)],
                     "awaiting_ticket_confirmation": False,
+                    "escalate_to_ticket": True,  # STRUCTURED FLAG for deterministic routing
                     "ticket": ticket_obj
                 }
             
@@ -147,11 +161,14 @@ Feel free to ask me anything else!"""
         
         if kb:
             try:
-                detected_cat = detect_category(user_message)
+                # Pass conversation context to LLM-based category detection
+                conversation_context = [m.content for m in messages[:-1]]
+                detected_cat = detect_category(user_message, conversation_context)
+                
                 kb_results = get_best_solution(
                     kb=kb,
                     issue_description=user_message,
-                    conversation_history=[m.content for m in messages[:-1]],
+                    conversation_history=conversation_context,
                     category=detected_cat
                 )
                 print(f"[ChatbotAgent] Detected category: {detected_cat}")
@@ -281,6 +298,115 @@ When in doubt, respond "YES"."""
             print(f"[ChatbotAgent] Scope check error: {e}, defaulting to True")
             # On error, default to allowing the request (fail-open)
             return True
+    
+    def _extract_ticket_fields(self, conversation_text: str, user_devices: List[str]) -> Dict:
+        """
+        LLM-based semantic extraction of ticket fields.
+        
+        INDUSTRY-STANDARD APPROACH:
+        - Uses structured output with Pydantic schema
+        - Semantic understanding instead of brittle phrase matching
+        - Handles synonyms, typos, and natural language variations
+        - e.g., "This box is toast" → Hardware/Critical
+        
+        Args:
+            conversation_text: Recent conversation context
+            user_devices: List of user's registered devices
+        
+        Returns:
+            Dict with extracted fields: device_id, priority, category
+        """
+        try:
+            # Build extraction LLM with structured output
+            extraction_llm = self.llm.with_structured_output(ExtractedTicketFields)
+            
+            devices_context = ", ".join(user_devices) if user_devices else "Not specified"
+            
+            extraction_prompt = f"""You are an expert IT support analyst. Extract ticket fields from the conversation.
+
+AVAILABLE USER DEVICES: {devices_context}
+
+EXTRACTION RULES:
+1. **Category** - Infer from the issue type:
+   - Network: WiFi, internet, VPN, connectivity issues
+   - Account: Login, password, MFA, access issues
+   - Hardware: Physical device problems, display, keyboard, battery, machine is dead, box is toast
+   - Software: Application crashes, errors, installations
+   - Email: Outlook, email sending/receiving issues
+   - General: Other IT issues
+
+2. **Priority** - Infer from urgency/impact (semantic understanding):
+   - Critical: system down, cannot work at all, emergency, completely broken, dead, toast
+   - High: urgent, blocking work, need this ASAP, cannot do my job
+   - Medium: affecting work, annoying, need help when possible
+   - Low: can wait, minor issue, when you get a chance
+
+3. **Device** - ONLY extract if user EXPLICITLY mentions a specific brand or model name:
+   - EXTRACT: "my Dell laptop", "MacBook is slow", "HP printer not working"
+   - DO NOT EXTRACT: "my laptop", "computer", "device" (generic terms without brand)
+   - DO NOT HALLUCINATE or guess brands that are not explicitly stated
+   - If user says just "laptop" without a brand, leave device_brand as None
+
+CONVERSATION:
+{conversation_text}
+
+CRITICAL: Only extract device_brand if the user EXPLICITLY mentions a brand name. Do not infer or guess."""
+            
+            result = extraction_llm.invoke([
+                SystemMessage(content=extraction_prompt)
+            ])
+            
+            extracted = {}
+            
+            # Map priority
+            if result.priority:
+                extracted["priority"] = result.priority
+            
+            # Map category
+            if result.category:
+                extracted["category"] = result.category
+            
+            # Match device from extraction to actual user devices
+            # STRICT: Only match if a specific brand was explicitly mentioned
+            if user_devices and (result.device_brand or result.device_type):
+                # Build search terms from brand and type
+                search_terms = []
+                if result.device_brand:
+                    search_terms.append(result.device_brand.lower())
+                    # Add common brand-product mappings
+                    brand_mappings = {
+                        'apple': ['macbook', 'ipad', 'iphone', 'imac'],
+                        'microsoft': ['surface'],
+                        'hp': ['elitebook', 'probook', 'laserjet'],
+                        'dell': ['latitude', 'xps', 'inspiron'],
+                        'lenovo': ['thinkpad', 'ideapad'],
+                    }
+                    if result.device_brand.lower() in brand_mappings:
+                        search_terms.extend(brand_mappings[result.device_brand.lower()])
+                
+                if result.device_type:
+                    # Only use device_type if it's a specific product name (not generic)
+                    device_type_lower = result.device_type.lower()
+                    if device_type_lower in ['macbook', 'thinkpad', 'surface', 'ipad', 'iphone']:
+                        search_terms.append(device_type_lower)
+                
+                # Try to match any search term to device list
+                for device in user_devices:
+                    device_lower = device.lower()
+                    for term in search_terms:
+                        if term in device_lower:
+                            extracted["device_id"] = device
+                            print(f"[ChatbotAgent] Matched device '{device}' from mention '{term}'")
+                            break
+                    if "device_id" in extracted:
+                        break
+            
+            print(f"[ChatbotAgent] LLM extraction result: priority={result.priority}, category={result.category}, device_brand={result.device_brand}, device_type={result.device_type}")
+            return extracted
+            
+        except Exception as e:
+            print(f"[ChatbotAgent] LLM extraction error: {e}")
+            return {}
     
     def _is_ambiguous_feedback(self, user_message: str, messages: List) -> bool:
         """
@@ -412,6 +538,12 @@ Return the updated fields only.
         
         # Auto-fill fields
         updated_ticket = self._auto_fill_fields(updated_ticket, user_info, detected_category, messages, user_devices)
+
+        if not updated_ticket.device_id and user_devices and len(user_devices) == 1:
+            # Auto-select the only available device
+            single_device = user_devices[0]
+            updated_ticket = updated_ticket.model_copy(update={"device_id": single_device})
+            print(f"[TicketAgent] ⚡ Auto-selected single device: {single_device}")
         
         # Check for missing fields and ask next question
         return self._ask_next_field(updated_ticket, user_devices, new_extra_index, state)
@@ -515,8 +647,16 @@ Return the updated fields only.
         return ticket, last_question, extra_idx
     
     def _auto_fill_fields(self, ticket, user_info, detected_cat, messages, user_devices):
-        """Auto-fill fields from context - ONLY when user explicitly mentions them"""
-        # User info
+        """
+        Auto-fill fields from context using LLM-based semantic extraction.
+        
+        INDUSTRY-STANDARD APPROACH:
+        - Uses LLM with Pydantic schema for semantic understanding
+        - Replaces brittle hardcoded phrase lists
+        - Handles synonyms, natural language, and edge cases
+        - e.g., "This box is toast" → Hardware/Critical
+        """
+        # User info (deterministic - no LLM needed)
         if not ticket.user_id and user_info:
             ticket = ticket.model_copy(update={
                 "user_id": user_info.get("user_id"),
@@ -540,73 +680,137 @@ Use TicketSchema tool to update ONLY issue_summary."""
         if not ticket.category and detected_cat:
             ticket = ticket.model_copy(update={"category": detected_cat})
 
-        # Device detection: ONLY from user's issue description messages (HumanMessage)
-        # Look for EXPLICIT device mentions like "my Dell laptop" or "MacBook"
+        # =====================================================================
+        # LLM-BASED SEMANTIC EXTRACTION (Industry Standard)
+        # Replaces brittle hardcoded phrase matching
+        # =====================================================================
         try:
-            if not ticket.device_id and user_devices:
-                # Only check HumanMessages that describe the issue (not confirmations like "yes")
-                issue_messages = []
-                for m in messages:
-                    if isinstance(m, HumanMessage):
-                        content = m.content.lower()
-                        # Skip short confirmations
-                        if len(content) > 10 and content not in ['yes', 'no', 'ok', 'okay']:
-                            issue_messages.append(content)
-                
-                issue_text = " ".join(issue_messages)
-                
-                # Only match if user explicitly mentions a device with context words
-                device_context_words = ['my', 'on', 'using', 'with', 'the', 'this']
-                for device in user_devices:
-                    dev_lower = device.lower()
-                    # Get significant tokens (skip generic words)
-                    significant_tokens = [t for t in dev_lower.replace('/', ' ').split() 
-                                        if t and len(t) > 2 and t not in ['pro', 'the']]
-                    
-                    # Check if device name appears with context
-                    for token in significant_tokens:
-                        if token in issue_text:
-                            # Verify it's in a device-mentioning context
-                            for ctx in device_context_words:
-                                if f"{ctx} {token}" in issue_text or f"{token}" in issue_text:
-                                    # Double-check: token should be a device identifier, not a common word
-                                    if token in ['dell', 'hp', 'macbook', 'ipad', 'iphone', 'latitude', 'printer', 'laserjet']:
-                                        ticket = ticket.model_copy(update={"device_id": device})
-                                        print(f"[TicketAgent] Auto-detected device: {device}")
-                                        break
-                    if ticket.device_id:
-                        break
-        except Exception as e:
-            print(f"[TicketAgent] Device detection error: {e}")
-
-        # Priority detection: ONLY from explicit urgency indicators in user's issue description
-        try:
-            if not ticket.priority:
-                # Only check HumanMessages that describe the issue
-                issue_messages = [m.content.lower() for m in messages 
+            # Only extract if we have missing fields
+            needs_device = not ticket.device_id and user_devices
+            needs_priority = not ticket.priority
+            
+            if needs_device or needs_priority:
+                # Collect issue description from human messages
+                issue_messages = [m.content for m in messages 
                                  if isinstance(m, HumanMessage) and len(m.content) > 10]
                 issue_text = " ".join(issue_messages)
                 
-                # Priority keywords with context - must be explicit
-                priority_phrases = {
-                    "Critical": ["system down", "completely down", "not working at all", "emergency", "critical"],
-                    "High": ["very urgent", "urgently", "asap", "blocking my work", "can't work", "blocking work", "please help"],
-                    "Medium": ["affecting work", "need help", "important"],
-                    # Don't auto-fill Low - let user choose
-                }
-                
-                for priority, phrases in priority_phrases.items():
-                    for phrase in phrases:
-                        if phrase in issue_text:
-                            ticket = ticket.model_copy(update={"priority": priority})
-                            print(f"[TicketAgent] Auto-detected priority: {priority} (phrase: {phrase})")
-                            break
-                    if ticket.priority:
-                        break
+                if issue_text:
+                    # Use LLM-based extraction
+                    extracted = self._llm_extract_fields(issue_text, user_devices)
+                    
+                    if needs_device and extracted.get("device_id"):
+                        ticket = ticket.model_copy(update={"device_id": extracted["device_id"]})
+                        print(f"[TicketAgent] LLM auto-detected device: {extracted['device_id']}")
+                    
+                    if needs_priority and extracted.get("priority"):
+                        ticket = ticket.model_copy(update={"priority": extracted["priority"]})
+                        print(f"[TicketAgent] LLM auto-detected priority: {extracted['priority']}")
+                        
         except Exception as e:
-            print(f"[TicketAgent] Priority detection error: {e}")
+            print(f"[TicketAgent] LLM extraction error: {e}")
 
         return ticket
+    
+    def _llm_extract_fields(self, issue_text: str, user_devices: List[str]) -> Dict:
+        """
+        LLM-based semantic extraction of ticket fields.
+        
+        This replaces the brittle hardcoded phrase matching with semantic understanding.
+        Examples of what this can now handle:
+        - "This box is toast" → Hardware, Critical
+        - "My laptop is being a pain" → Hardware, Medium
+        - "Everything is on fire" → Critical
+        - "Can't access anything" → Critical
+        
+        Args:
+            issue_text: Combined text from user's issue descriptions
+            user_devices: List of user's registered devices
+        
+        Returns:
+            Dict with 'device_id' and 'priority' if detected
+        """
+        try:
+            extraction_llm = self.llm.with_structured_output(ExtractedTicketFields)
+            devices_context = ", ".join(user_devices) if user_devices else "None available"
+            
+            extraction_prompt = f"""You are an expert IT support analyst. Extract ticket fields semantically from the user's issue description.
+
+AVAILABLE USER DEVICES: {devices_context}
+
+SEMANTIC EXTRACTION RULES:
+
+1. **Priority** - Understand the MEANING, not just keywords:
+   - Critical: Complete inability to work, system failures
+     Examples: system down, cannot do anything, completely broken, dead, toast, everything is on fire
+   - High: Significant work impact, urgent need
+     Examples: urgent, blocking me, need ASAP, cannot continue, stuck
+   - Medium: Work affected but can function, needs attention
+     Examples: annoying, affecting productivity, need help, frustrating
+   - Low: Minor issues, can wait
+     Examples: when you can, not urgent, minor, small thing
+
+2. **Device** - STRICT RULES (DO NOT HALLUCINATE):
+   - ONLY extract device_brand if user EXPLICITLY mentions a brand name like Dell, HP, Apple, MacBook, Lenovo, ThinkPad
+   - ONLY extract device_type if user mentions it (laptop, desktop, phone, printer)
+   - DO NOT extract device_brand for generic terms like "my laptop", "computer", "machine"
+   - If user says "my laptop" without a brand, set device_brand=None, device_type="laptop"
+   - NEVER guess or infer a brand that is not explicitly stated in the text
+
+USER'S ISSUE DESCRIPTION:
+{issue_text}
+
+CRITICAL: Only extract device_brand if EXPLICITLY mentioned. Generic terms like 'laptop' should NOT result in a brand extraction."""
+            
+            result = extraction_llm.invoke([SystemMessage(content=extraction_prompt)])
+            
+            extracted = {}
+            
+            # Map priority directly from LLM output
+            if result.priority and result.confidence >= 0.5:
+                extracted["priority"] = result.priority
+            
+            # Match device from LLM extraction to actual user devices
+            # STRICT: Only match if a specific brand was explicitly mentioned
+            if user_devices and (result.device_brand or result.device_type):
+                # Build search terms from brand and type
+                search_terms = []
+                if result.device_brand:
+                    search_terms.append(result.device_brand.lower())
+                    # Add common brand-product mappings
+                    brand_mappings = {
+                        'apple': ['macbook', 'ipad', 'iphone', 'imac'],
+                        'microsoft': ['surface'],
+                        'hp': ['elitebook', 'probook', 'laserjet'],
+                        'dell': ['latitude', 'xps', 'inspiron'],
+                        'lenovo': ['thinkpad', 'ideapad'],
+                    }
+                    if result.device_brand.lower() in brand_mappings:
+                        search_terms.extend(brand_mappings[result.device_brand.lower()])
+                
+                if result.device_type:
+                    # Only use device_type if it's a specific product name (not generic)
+                    device_type_lower = result.device_type.lower()
+                    if device_type_lower in ['macbook', 'thinkpad', 'surface', 'ipad', 'iphone']:
+                        search_terms.append(device_type_lower)
+                
+                # Try to match any search term to device list
+                for device in user_devices:
+                    device_lower = device.lower()
+                    for term in search_terms:
+                        if term in device_lower:
+                            extracted["device_id"] = device
+                            print(f"[TicketAgent] Matched device '{device}' from mention '{term}'")
+                            break
+                    if "device_id" in extracted:
+                        break
+            
+            print(f"[TicketAgent] LLM extraction: priority={result.priority}, device_brand={result.device_brand}, device_type={result.device_type}, confidence={result.confidence}")
+            return extracted
+            
+        except Exception as e:
+            print(f"[TicketAgent] LLM extraction error: {e}")
+            return {}
     
     def _ask_next_field(self, ticket, user_devices, extra_idx, state):
         """Ask for next missing field with validation"""

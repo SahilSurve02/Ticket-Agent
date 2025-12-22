@@ -282,41 +282,109 @@ def get_best_solution(
 #         "kb_confidence": kb_results.get("confidence", "none")
 #     }
 
-def detect_category(message: str) -> Optional[str]:
-    """Detect issue category from user message - returns category matching KB and form templates"""
+class CategoryDetectionResult(BaseModel):
+    """Structured output for LLM-based category detection"""
+    category: str = Field(description="Detected category: Network, Account, Hardware, Software, Email, OUT_OF_SCOPE, or General")
+    confidence: str = Field(description="Confidence level: high, medium, or low")
+    reasoning: str = Field(description="Brief explanation for the categorization")
+
+def detect_category(message: str, conversation_context: Optional[List[str]] = None) -> Optional[str]:
+    """
+    LLM-based category detection using KB articles and conversation context.
+    
+    Args:
+        message: Current user message
+        conversation_context: Previous messages for context (optional)
+    
+    Returns:
+        Category string: Network, Account, Hardware, Software, Email, OUT_OF_SCOPE, or General
+    """
+    kb = get_global_kb()
+    
+    # Build context from conversation history
+    context_text = ""
+    if conversation_context:
+        context_text = "\nConversation History:\n" + "\n".join(conversation_context[-3:])
+    
+    # Search KB for relevant articles to aid categorization
+    kb_context = ""
+    if kb:
+        try:
+            # Get top matching KB articles (without category filter)
+            results = search_knowledge(kb, message, category=None, top_k=3, min_similarity=0.25)
+            
+            if results:
+                kb_context = "\n\nRelevant Knowledge Base Articles:\n"
+                for i, result in enumerate(results[:2], 1):  # Use top 2
+                    category = result.get("metadata", {}).get("category", "Unknown")
+                    title = result.get("metadata", {}).get("title", "No title")
+                    kb_context += f"{i}. [{category}] {title}\n"
+        except Exception as e:
+            print(f"[KB] Error during category detection KB search: {e}")
+    
+    # LLM-based categorization with KB context
+    system_prompt = """You are an IT support category classifier. Analyze the user's message and classify it into ONE of these categories:
+
+**IT Support Categories:**
+- Network: WiFi, internet connectivity, VPN, network issues
+- Account: Login problems, password resets, account lockouts, authentication
+- Hardware: Physical devices (laptop, monitor, keyboard, mouse, printer), performance issues, crashes
+- Software: Applications, programs, software installation/updates, Office apps
+- Email: Email-related issues, Outlook, mail sending/receiving
+
+**Special Categories:**
+- OUT_OF_SCOPE: Non-IT requests (travel booking, food ordering, shopping, entertainment)
+- General: IT-related but doesn't fit other categories clearly
+
+**Guidelines:**
+1. Use the KB articles (if provided) as strong signals for category
+2. Consider conversation context to understand the issue better
+3. OUT_OF_SCOPE requires STRONG indicators (specific action verbs like "book flight", "order pizza")
+4. When in doubt between categories, choose the most specific match
+5. Hardware includes performance issues (slow, freezing, crashes)"""
+
+    user_prompt = f"""Current Message: {message}{context_text}{kb_context}
+
+Classify this into the most appropriate category."""
+
+    try:
+        # Use structured output for reliable parsing
+        structured_llm = llm.with_structured_output(CategoryDetectionResult)
+        
+        result = structured_llm.invoke([
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt)
+        ])
+        
+        print(f"[KB] LLM Category Detection: {result.category} (confidence: {result.confidence})")
+        print(f"[KB] Reasoning: {result.reasoning}")
+        
+        return result.category
+        
+    except Exception as e:
+        print(f"[KB] LLM category detection failed: {e}. Falling back to keyword matching.")
+        # Fallback to simple keyword matching
+        return _fallback_keyword_category(message)
+
+def _fallback_keyword_category(message: str) -> Optional[str]:
+    """Fallback keyword-based categorization if LLM fails"""
     message_lower = message.lower()
     
-    # Only flag CLEARLY other-domain requests (need strong contextual indicators)
-    # These require specific action verbs + domain keywords to avoid false positives
-    out_of_scope_patterns = [
-        # Travel (with action verbs)
-        ("book", ["flight", "bus", "train", "ticket to", "hotel"]),
-        ("reserve", ["flight", "hotel", "taxi"]),
-        ("i want", ["bus ticket", "train ticket", "flight to"]),
-        ("need", ["bus ticket", "train ticket", "flight to"]),
-        # Food (with action verbs)
-        ("order", ["pizza", "food", "lunch", "dinner"]),
-        ("book", ["restaurant", "table"]),
-        # Shopping (with action verbs)
-        ("buy", ["from amazon", "online", "product"]),
-        ("purchase", ["laptop from", "phone from"]),
-        # Entertainment tickets
-        ("book", ["movie ticket", "concert ticket"]),
-        ("tickets for", ["movie", "concert", "show"]),
+    # Simple OUT_OF_SCOPE check
+    out_of_scope_phrases = [
+        "book flight", "book hotel", "order pizza", "order food",
+        "buy from amazon", "movie ticket", "concert ticket"
     ]
+    if any(phrase in message_lower for phrase in out_of_scope_phrases):
+        return "OUT_OF_SCOPE"
     
-    for action, domain_keywords in out_of_scope_patterns:
-        if action in message_lower:
-            if any(keyword in message_lower for keyword in domain_keywords):
-                return "OUT_OF_SCOPE"
-    
-    # Categories now match KB and form templates
+    # Basic keyword matching
     categories = {
-        "Network": ["wifi", "wireless", "internet", "connection", "network", "router", "vpn", "ethernet", "connected"],
-        "Account": ["login", "password", "account", "locked", "authentication", "credentials", "mfa", "2fa", "sign in", "sign-in"],
-        "Hardware": ["slow", "performance", "freeze", "crash", "hardware", "laptop", "computer", "monitor", "keyboard", "mouse", "battery", "screen", "display", "audio", "sound", "printer"],
-        "Software": ["application", "program", "software", "install", "update", "app", "office", "word", "excel", "windows update"],
-        "Email": ["email", "outlook", "mail", "inbox", "sending", "receiving", "emails"]
+        "Network": ["wifi", "wireless", "internet", "connection", "network", "vpn"],
+        "Account": ["login", "password", "account", "locked", "authentication"],
+        "Hardware": ["slow", "freeze", "crash", "hardware", "laptop", "monitor", "keyboard"],
+        "Software": ["application", "software", "install", "update", "app"],
+        "Email": ["email", "outlook", "mail", "inbox"]
     }
     
     for category, keywords in categories.items():
