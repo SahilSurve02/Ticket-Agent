@@ -196,9 +196,24 @@ Feel free to ask me anything else!"""
         
         print(f"[ChatbotAgent] Ambiguous feedback: {is_ambiguous_feedback}, Wants ticket: {wants_ticket_explicit}, Solution failed: {solution_failed}")
         
+        # ✅ CRITICAL: Don't offer ticket if request is OUT_OF_SCOPE
+        if detected_cat == "OUT_OF_SCOPE":
+            msg = """I appreciate you wanting to create a ticket, but your request appears to be outside IT support scope.
+
+I can help with IT issues like password resets, software problems, hardware issues, and network connectivity.
+
+For other requests, please contact the appropriate department.
+Is there any IT support I can help you with?"""
+            print(f"[ChatbotAgent] Request is OUT_OF_SCOPE, not offering ticket")
+            return {
+                "messages": [AIMessage(content=msg)],
+                "detected_category": detected_cat,
+                "awaiting_ticket_confirmation": False
+            }
+        
         # If user gives ambiguous feedback, explicitly wants ticket, OR solution failed -> ASK
         if is_ambiguous_feedback or wants_ticket_explicit or solution_failed:
-            msg = "Would you like me to create a support ticket for this issue? I can help you file it with our support team. (yes/no)"
+            msg = "Would you like me to create a support ticket for this issue? (yes/no)"
             print(f"[ChatbotAgent] Asking user for ticket confirmation")
             return {
                 "messages": [AIMessage(content=msg)],
@@ -261,6 +276,7 @@ This chatbot CAN handle:
 - General conversation (greetings, small talk, questions)
 - IT support (password resets, software issues, hardware problems, network, email)
 - Unclear or ambiguous requests (give benefit of the doubt)
+- Creating IT SUPPORT TICKETS (file a ticket, create ticket, etc.)
 
 This chatbot should ONLY REJECT requests that are clearly in OTHER SPECIFIC DOMAINS:
 - Travel and transportation (booking flights, trains, buses, taxis, hotels)
@@ -269,7 +285,16 @@ This chatbot should ONLY REJECT requests that are clearly in OTHER SPECIFIC DOMA
 - Entertainment bookings (movie tickets, concert tickets, event tickets)
 - Professional services (doctor appointments, legal advice, financial services)
 
+CRITICAL DISAMBIGUATION:
+- "book a ticket for my laptop" → IT SUPPORT (laptop = IT device, means create support ticket) → YES
+- "book a ticket to Paris" → TRAVEL (destination = travel intent) → NO
+- "file a ticket" → IT SUPPORT (IT context) → YES
+- "create ticket" → IT SUPPORT (IT context) → YES
+- "book flight" → TRAVEL → NO
+- "order pizza" → FOOD → NO
+
 IMPORTANT RULES:
+- If message mentions IT devices (laptop, computer, WiFi, software) → ALLOW (respond "YES")
 - Greetings and casual conversation → ALLOW (respond "YES")
 - Unclear or ambiguous requests → ALLOW (respond "YES")
 - IT support questions → ALLOW (respond "YES")

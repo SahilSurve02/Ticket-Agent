@@ -283,5 +283,38 @@
       "component": "Other",
       "physical_damage": "N/A"
     }
+  },
+  {
+    "ticket_id": "TKT-CF6388A9",
+    "created_at": "2025-12-22 16:18:19",
+    "user_id": "EMP-12345",
+    "user_name": "Krishna Ronaldo",
+    "email": "krishna.ronaldo@company.com",
+    "phone": "+1-777-0123",
+    "department": "Engineering",
+    "category": "Network",
+    "issue_summary": "WiFi connectivity issue",
+    "device_id": "iPhone 14",
+    "priority": "High",
+    "description": "User reported a WiFi connectivity issue on their iPhone 14. Troubleshooting steps included confirming the type of connection and checking for error messages, which returned none. Outcome: User still unable to connect to WiFi. Further assistance required.",
+    "extra_fields": {
+      "connection_type": "WiFi",
+      "error_message": "nnnnnnnnnnn"
+    }
+  },
+  {
+    "ticket_id": "TKT-1B451B80",
+    "created_at": "2025-12-22 16:24:47",
+    "user_id": "EMP-12345",
+    "user_name": "Krishna Ronaldo",
+    "email": "krishna.ronaldo@company.com",
+    "phone": "+1-777-0123",
+    "department": "Engineering",
+    "category": "General",
+    "issue_summary": "File a support ticket",
+    "device_id": "iPad Pro",
+    "priority": "High",
+    "description": "User reported the need to file a support ticket for their iPad Pro. No troubleshooting steps were attempted. Outcome: User was advised on the ticket submission process.",
+    "extra_fields": {}
   }
 ]

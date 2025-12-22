@@ -336,12 +336,21 @@ def detect_category(message: str, conversation_context: Optional[List[str]] = No
 - OUT_OF_SCOPE: Non-IT requests (travel booking, food ordering, shopping, entertainment)
 - General: IT-related but doesn't fit other categories clearly
 
-**Guidelines:**
-1. Use the KB articles (if provided) as strong signals for category
-2. Consider conversation context to understand the issue better
-3. OUT_OF_SCOPE requires STRONG indicators (specific action verbs like "book flight", "order pizza")
-4. When in doubt between categories, choose the most specific match
-5. Hardware includes performance issues (slow, freezing, crashes)"""
+**CRITICAL CONTEXT RULES:**
+1. You are analyzing THIS IN AN IT SUPPORT CHATBOT CONTEXT
+2. Phrases like "create ticket", "file ticket", "file a ticket" mean IT SUPPORT TICKET, NOT travel/event tickets
+3. If conversation mentions IT issues (laptop, WiFi, etc.), assume IT support context
+4. Use the KB articles (if provided) as strong signals for category
+5. Consider conversation context to understand the issue better
+6. OUT_OF_SCOPE requires STRONG indicators for NON-IT domains (specific action verbs like "book flight to Paris", "order pizza delivery", "buy from Amazon")
+7. When in doubt between IT categories, choose the most specific match
+8. Hardware includes performance issues (slow, freezing, crashes)
+
+**Examples:**
+- "book a ticket" (no IT context) → OUT_OF_SCOPE (likely travel)
+- "file a ticket" (in IT support chat) → General (requesting IT support ticket)
+- "my laptop won't start" → Hardware
+- "book flight to NYC" → OUT_OF_SCOPE (clear travel intent)"""
 
     user_prompt = f"""Current Message: {message}{context_text}{kb_context}
 
