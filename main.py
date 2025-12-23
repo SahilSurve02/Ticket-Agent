@@ -7,6 +7,7 @@ from langgraph.checkpoint.memory import MemorySaver
 import uuid
 import os
 import traceback
+from src.db import init_db
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -216,6 +217,9 @@ workflow.add_edge("submit_ticket", END)
 
 def run_chat():
     """Main chat loop"""
+    # Initialize DB
+    init_db()
+
     # Initialize KB
     from src.kb import set_global_kb
     kb = initialize_kb_with_check("./chroma_db")

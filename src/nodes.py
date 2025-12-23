@@ -7,6 +7,7 @@ from src.agents import get_chatbot_agent, get_ticket_agent
 import os
 import json
 from datetime import datetime
+from src.db import save_ticket, check_for_duplicate_ticket
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -171,35 +172,6 @@ def ticket_confirmation_node(state: AgentState):
 # =============================================================================
 # NODE 5: SUBMIT TICKET - Create the final ticket and save to file
 # =============================================================================
-def save_ticket_to_file(ticket_data: dict) -> bool:
-    """Save ticket to JSON file"""
-    try:
-        # Ensure data directory exists
-        os.makedirs(os.path.dirname(TICKETS_FILE), exist_ok=True)
-        
-        # Load existing tickets
-        tickets = []
-        if os.path.exists(TICKETS_FILE):
-            with open(TICKETS_FILE, 'r', encoding='utf-8') as f:
-                try:
-                    tickets = json.load(f)
-                except json.JSONDecodeError:
-                    tickets = []
-        
-        # Append new ticket
-        tickets.append(ticket_data)
-        
-        # Save back to file
-        with open(TICKETS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(tickets, f, indent=2, ensure_ascii=False)
-        
-        print(f"[SYSTEM] Ticket saved to {TICKETS_FILE}")
-        return True
-    except Exception as e:
-        print(f"[ERROR] Failed to save ticket: {e}")
-        return False
-
-
 def submit_ticket_node(state: AgentState):
     """Create the ticket with all collected information and save to file"""
     current_ticket = state["ticket"]
@@ -226,8 +198,43 @@ def submit_ticket_node(state: AgentState):
     # Convert to dict for storage
     ticket_dict = final_ticket.model_dump()
     
-    # Save to file
-    saved = save_ticket_to_file(ticket_dict)
+#     # Check for duplicate tickets (prevent multiple open tickets for same issue)
+#     # Skip if user explicitly chose to proceed with duplicate
+#     if not state.get("skip_duplicate_check"):
+#         user_id = user_info.get("user_id")
+#         category = final_ticket.category
+        
+#         if user_id and category:
+#             has_duplicate = check_for_duplicate_ticket(user_id, category)
+#             if has_duplicate:
+#                 # Ask user if they want to proceed anyway
+#                 duplicate_warning = f"""⚠️ **Duplicate Ticket Warning**
+                
+# You already have an open ticket in the **{category}** category.
+
+# Would you like to:
+# • Type **"proceed"** to create this ticket anyway
+# • Type **"cancel"** to cancel this ticket
+# • Type **"view"** to see your existing tickets"""
+                
+#                 return {
+#                     "messages": [AIMessage(content=duplicate_warning)],
+#                     "awaiting_duplicate_confirmation": True,
+#                     "awaiting_confirmation": False
+#                 }
+    
+    # Save to database
+    saved = save_ticket(ticket_dict)
+
+    # Handle Database Failure (FR-022)
+    if not saved:
+        return {
+            "messages": [AIMessage(content="❌ System Error: Could not save ticket to database. Please type **'submit'** to try again.")],
+            # Do NOT clear the ticket here, so user can retry
+            "awaiting_confirmation": True,
+            "confirmation_action": "submit"
+        }
+
     
     # Also print to console for debugging
     print(f"\n[SYSTEM] Ticket Created: {json.dumps(ticket_dict, indent=2)}\n")
@@ -243,8 +250,6 @@ def submit_ticket_node(state: AgentState):
 
 ---
 
-{save_status}
-
 Your ticket has been submitted and assigned to the IT Support team.  
 📧 Updates will be sent to: **{user_info.get('email', 'your registered email')}**
 
@@ -257,6 +262,8 @@ Is there anything else I can help you with?"""
         "ticket": create_empty_ticket(),
         "ticket_preview_shown": False,
         "awaiting_confirmation": False,
+        # "awaiting_duplicate_confirmation": False,
+        # "skip_duplicate_check": False,
         "last_question": None,
         "current_extra_field_index": 0,
         "edit_mode": False,

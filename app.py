@@ -14,6 +14,7 @@ import uuid
 import os
 from dotenv import load_dotenv
 from datetime import datetime
+from src.db import init_db
 import traceback
 
 load_dotenv()
@@ -1373,6 +1374,10 @@ def render_chat():
 
 def main():
     """Main application entry point"""
+
+    # Initialize DB
+    init_db()
+
     # Initialize session state
     initialize_session_state()
     
