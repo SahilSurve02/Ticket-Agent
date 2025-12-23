@@ -21,7 +21,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
 
 
 # =============================================================================
@@ -43,7 +43,7 @@ class ChatbotAgent:
     
     def __init__(self):
         self.name = "Chatbot Agent"
-        self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        self.llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
         # LLM with structured output for deterministic handoff decisions
         self.structured_llm = self.llm.with_structured_output(ChatbotResponseAction)
     
@@ -351,7 +351,7 @@ When in doubt, respond "YES"."""
 
 AVAILABLE USER DEVICES: {devices_context}
 
-EXTRACTION RULES:
+EXTRACTION RULES STRICT RULES (DO NOT HALLUCINATE)::
 1. **Category** - Infer from the issue type:
    - Network: WiFi, internet, VPN, connectivity issues
    - Account: Login, password, MFA, access issues
@@ -367,10 +367,12 @@ EXTRACTION RULES:
    - Low: can wait, minor issue, when you get a chance
 
 3. **Device** - ONLY extract if user EXPLICITLY mentions a specific brand or model name:
-   - EXTRACT: "my Dell laptop", "MacBook is slow", "HP printer not working"
-   - DO NOT EXTRACT: "my laptop", "computer", "device" (generic terms without brand)
-   - DO NOT HALLUCINATE or guess brands that are not explicitly stated
-   - If user says just "laptop" without a brand, leave device_brand as None. Do not infer or guess
+   - ONLY extract device_brand if user EXPLICITLY mentions a brand name like Dell, HP, Apple, MacBook, Lenovo
+   - ONLY extract device_type if user mentions it (laptop, desktop, phone, printer)
+   - DO NOT extract device_brand for generic terms like "my laptop", "computer", "machine"
+   - If user says "my laptop" or similar without a brand, set device_brand=None, device_type="laptop"
+   - NEVER guess or infer a brand that is not explicitly stated in the text
+
 
 CONVERSATION:
 {conversation_text}
@@ -472,7 +474,7 @@ class TicketAgent:
     
     def __init__(self):
         self.name = "Ticket Agent"
-        self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        self.llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
         self.llm_with_tools = self.llm.bind_tools([TicketSchema])
     
     def process_ticket_collection(self, state: AgentState) -> Dict:
@@ -594,22 +596,38 @@ Return the updated fields only.
             matched_device = None
             user_input = user_msg.lower().strip()
             
+            # Collect all potential matches with their match quality scores
+            candidates = []
+            
             for device in user_devices:
-                # Match by partial token or full name
                 dev_lower = device.lower()
-                dev_tokens = [t for t in dev_lower.replace('/', ' ').split() if t and len(t) > 2]
                 
-                if dev_lower in user_input or user_input in dev_lower:
-                    matched_device = device
-                    break
+                # Priority 1: Exact match (case-insensitive)
+                if dev_lower == user_input or user_input == dev_lower:
+                    candidates.append((device, 1000))  # Highest priority
+                    continue
+                
+                # Priority 2: Full device name contained in input
+                elif dev_lower in user_input:
+                    candidates.append((device, 500 + len(dev_lower)))  # Prefer longer matches
+                    continue
+                
+                # Priority 3: Input contained in device name
+                elif user_input in dev_lower:
+                    candidates.append((device, 400 + len(user_input)))
+                    continue
+                
+                # Priority 4: Token-based matching (lowest priority)
+                dev_tokens = [t for t in dev_lower.replace('/', ' ').split() if t and len(t) > 2]
                 for token in dev_tokens:
                     if token in user_input:
-                        matched_device = device
+                        # Score based on token length to prefer more specific matches
+                        candidates.append((device, len(token)))
                         break
-                if matched_device:
-                    break
             
-            if matched_device:
+            # Select the best match (highest score)
+            if candidates:
+                matched_device = max(candidates, key=lambda x: x[1])[0]
                 ticket = ticket.model_copy(update={"device_id": matched_device})
                 print(f"[TicketAgent] Device validated: {matched_device}")
             else:
@@ -779,7 +797,7 @@ SEMANTIC EXTRACTION RULES:
    - ONLY extract device_brand if user EXPLICITLY mentions a brand name like Dell, HP, Apple, MacBook, Lenovo
    - ONLY extract device_type if user mentions it (laptop, desktop, phone, printer)
    - DO NOT extract device_brand for generic terms like "my laptop", "computer", "machine"
-   - If user says "my laptop" without a brand, set device_brand=None, device_type="laptop"
+   - If user says "my laptop" or similar without a brand, set device_brand=None, device_type="laptop"
    - NEVER guess or infer a brand that is not explicitly stated in the text
 
 USER'S ISSUE DESCRIPTION:

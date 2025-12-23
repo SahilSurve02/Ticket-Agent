@@ -69,7 +69,7 @@ class LLMRouter:
     This replaces brittle if/elif rule-based routing with semantic understanding.
     """
     
-    def __init__(self, model: str = "gpt-4o-mini", temperature: float = 0):
+    def __init__(self, model: str = "gpt-4.1-mini", temperature: float = 0):
         """Initialize the router with a fast, low-cost model"""
         self.llm = ChatOpenAI(model=model, temperature=temperature)
         

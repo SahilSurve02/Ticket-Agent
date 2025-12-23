@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize LLM
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
 
 # Ticket storage file path
 TICKETS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "tickets.json")
