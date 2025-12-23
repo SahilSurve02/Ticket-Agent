@@ -691,7 +691,8 @@ Return the updated fields only.
         # Issue summary - extract from user's original issue description
         if not ticket.issue_summary:
             summary_prompt = """Extract brief issue summary (5-10 words) from conversation.
-Use TicketSchema tool to update ONLY issue_summary."""
+Use TicketSchema tool to update ONLY issue_summary.
+Critical: Do not mention device names or user info in the summary."""
             response = self.llm_with_tools.invoke([SystemMessage(content=summary_prompt)] + messages)
             if response.tool_calls:
                 new_data = response.tool_calls[0]['args']
@@ -973,7 +974,6 @@ Choose: Low, Medium, High, or Critical"""
         CRITICAL RULES:
         - ONLY include information explicitly stated in the conversation
         - DO NOT invent or assume troubleshooting steps that didn't happen
-        - If no troubleshooting occurred, say "No troubleshooting steps performed yet"
         - DO NOT fabricate technical details
         - Do not mention device brand/model into the description only mention device type if mentioned
 
