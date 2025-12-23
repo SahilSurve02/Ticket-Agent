@@ -54,7 +54,7 @@ class RouterDecision(BaseModel):
     """Structured output from the LLM router"""
     route: str = Field(description="The routing decision")
     confidence: float = Field(default=1.0, description="Confidence score 0-1")
-    reasoning: str = Field(default="", description="Reasoning for the decision about the route chosen in 10-15 words")
+    reasoning: str = Field(default="", description="Reasoning for the decision about the route chosen in 8-10 words")
 
 
 # =============================================================================

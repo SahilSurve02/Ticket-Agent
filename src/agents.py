@@ -370,7 +370,7 @@ EXTRACTION RULES:
    - EXTRACT: "my Dell laptop", "MacBook is slow", "HP printer not working"
    - DO NOT EXTRACT: "my laptop", "computer", "device" (generic terms without brand)
    - DO NOT HALLUCINATE or guess brands that are not explicitly stated
-   - If user says just "laptop" without a brand, leave device_brand as None
+   - If user says just "laptop" without a brand, leave device_brand as None. Do not infer or guess
 
 CONVERSATION:
 {conversation_text}
@@ -391,40 +391,33 @@ CRITICAL: Only extract device_brand if the user EXPLICITLY mentions a brand name
             if result.category:
                 extracted["category"] = result.category
             
-            # Match device from extraction to actual user devices
-            # STRICT: Only match if a specific brand was explicitly mentioned
-            if user_devices and (result.device_brand or result.device_type):
-                # Build search terms from brand and type
-                search_terms = []
-                if result.device_brand:
-                    search_terms.append(result.device_brand.lower())
-                    # Add common brand-product mappings
-                    brand_mappings = {
-                        'apple': ['macbook', 'ipad', 'iphone', 'imac'],
-                        'microsoft': ['surface'],
-                        'hp': ['elitebook', 'probook', 'laserjet'],
-                        'dell': ['latitude', 'xps', 'inspiron'],
-                        'lenovo': ['thinkpad', 'ideapad'],
-                    }
-                    if result.device_brand.lower() in brand_mappings:
-                        search_terms.extend(brand_mappings[result.device_brand.lower()])
+            # Match device using LLM intelligence (avoids buggy string matching)
+            # ONLY match if user explicitly mentioned a brand (avoid ambiguous guessing)
+            if user_devices and result.device_brand:
+                # Let LLM match the mentioned device to registered devices
+                device_match_prompt = f"""Match the user's device mention to their registered devices.
+
+User mentioned: {result.device_brand or ''} {result.device_type or ''}
+
+Registered devices:
+{chr(10).join(f'- {d}' for d in user_devices)}
+
+Return the EXACT registered device name that best matches the user's mention.
+If no good match exists, return 'None'.
+Return ONLY the device name, nothing else."""
                 
-                if result.device_type:
-                    # Only use device_type if it's a specific product name (not generic)
-                    device_type_lower = result.device_type.lower()
-                    if device_type_lower in ['macbook', 'thinkpad', 'surface', 'ipad', 'iphone']:
-                        search_terms.append(device_type_lower)
-                
-                # Try to match any search term to device list
-                for device in user_devices:
-                    device_lower = device.lower()
-                    for term in search_terms:
-                        if term in device_lower:
-                            extracted["device_id"] = device
-                            print(f"[ChatbotAgent] Matched device '{device}' from mention '{term}'")
-                            break
-                    if "device_id" in extracted:
-                        break
+                try:
+                    match_result = self.llm.invoke([SystemMessage(content=device_match_prompt)])
+                    matched_device = match_result.content.strip()
+                    
+                    # Validate LLM returned an actual device from the list
+                    if matched_device in user_devices:
+                        extracted["device_id"] = matched_device
+                        print(f"[ChatbotAgent] LLM matched device: '{matched_device}'")
+                    else:
+                        print(f"[ChatbotAgent] LLM returned invalid device: '{matched_device}'")
+                except Exception as e:
+                    print(f"[ChatbotAgent] Device matching error: {e}")
             
             print(f"[ChatbotAgent] LLM extraction result: priority={result.priority}, category={result.category}, device_brand={result.device_brand}, device_type={result.device_type}")
             return extracted
@@ -520,7 +513,11 @@ Use the TicketSchema tool to apply these changes.
 - For device_id, match to the closest device from the available devices list.
 
 Map category to: "Network", "Account", "Hardware", "Software", "Email", "General".
-Map priority to: "Low", "Medium", "High", "Critical".
+Map priority to:
+- "low", "l", "1" → use EXACT value: "Low"
+- "medium", "med", "m", "2" → use EXACT value: "Medium"
+- "high", "h", "3" → use EXACT value: "High"
+- "critical", "crit", "c", "4" → use EXACT value: "Critical"
 
 Return the updated fields only.
 """
@@ -757,7 +754,9 @@ Use TicketSchema tool to update ONLY issue_summary."""
         """
         try:
             extraction_llm = self.llm.with_structured_output(ExtractedTicketFields)
+            print(f"Issue text for extraction: {issue_text}")
             devices_context = ", ".join(user_devices) if user_devices else "None available"
+            print(f"[TicketAgent] User devices for extraction context: {devices_context}")
             
             extraction_prompt = f"""You are an expert IT support analyst. Extract ticket fields semantically from the user's issue description.
 
@@ -776,7 +775,7 @@ SEMANTIC EXTRACTION RULES:
      Examples: when you can, not urgent, minor, small thing
 
 2. **Device** - STRICT RULES (DO NOT HALLUCINATE):
-   - ONLY extract device_brand if user EXPLICITLY mentions a brand name like Dell, HP, Apple, MacBook, Lenovo, ThinkPad
+   - ONLY extract device_brand if user EXPLICITLY mentions a brand name like Dell, HP, Apple, MacBook, Lenovo
    - ONLY extract device_type if user mentions it (laptop, desktop, phone, printer)
    - DO NOT extract device_brand for generic terms like "my laptop", "computer", "machine"
    - If user says "my laptop" without a brand, set device_brand=None, device_type="laptop"
@@ -785,50 +784,44 @@ SEMANTIC EXTRACTION RULES:
 USER'S ISSUE DESCRIPTION:
 {issue_text}
 
-CRITICAL: Only extract device_brand if EXPLICITLY mentioned. Generic terms like 'laptop' should NOT result in a brand extraction."""
+CRITICAL: Only extract device_brand if EXPLICITLY mentioned. Generic terms like 'laptop' should NOT result in a brand extraction.Do not assume device always matches it with {devices_context}."""
             
             result = extraction_llm.invoke([SystemMessage(content=extraction_prompt)])
             
             extracted = {}
-            
+            # print(f"Result from LLM extraction: {result}")
             # Map priority directly from LLM output
             if result.priority and result.confidence >= 0.5:
                 extracted["priority"] = result.priority
             
-            # Match device from LLM extraction to actual user devices
-            # STRICT: Only match if a specific brand was explicitly mentioned
-            if user_devices and (result.device_brand or result.device_type):
-                # Build search terms from brand and type
-                search_terms = []
-                if result.device_brand:
-                    search_terms.append(result.device_brand.lower())
-                    # Add common brand-product mappings
-                    brand_mappings = {
-                        'apple': ['macbook', 'ipad', 'iphone', 'imac'],
-                        'microsoft': ['surface'],
-                        'hp': ['elitebook', 'probook', 'laserjet'],
-                        'dell': ['latitude', 'xps', 'inspiron'],
-                        'lenovo': ['thinkpad', 'ideapad'],
-                    }
-                    if result.device_brand.lower() in brand_mappings:
-                        search_terms.extend(brand_mappings[result.device_brand.lower()])
+            # Match device using LLM intelligence (avoids buggy string matching)
+            # ONLY match if user explicitly mentioned a brand (avoid ambiguous guessing)
+            if user_devices and result.device_brand:
+                print(f"[TicketAgent] LLM extracted device_brand: {result.device_brand}, device_type: {result.device_type}")
+                # Let LLM match the mentioned device to registered devices
+                device_match_prompt = f"""Match the user's device mention to their registered devices.
+
+User mentioned: {result.device_brand or ''} {result.device_type or ''}
+
+Registered devices:
+{chr(10).join(f'- {d}' for d in user_devices)}
+
+Return the EXACT registered device name that best matches the user's mention.
+If no good match exists, return 'None'.
+Return ONLY the device name, nothing else."""
                 
-                if result.device_type:
-                    # Only use device_type if it's a specific product name (not generic)
-                    device_type_lower = result.device_type.lower()
-                    if device_type_lower in ['macbook', 'thinkpad', 'surface', 'ipad', 'iphone']:
-                        search_terms.append(device_type_lower)
-                
-                # Try to match any search term to device list
-                for device in user_devices:
-                    device_lower = device.lower()
-                    for term in search_terms:
-                        if term in device_lower:
-                            extracted["device_id"] = device
-                            print(f"[TicketAgent] Matched device '{device}' from mention '{term}'")
-                            break
-                    if "device_id" in extracted:
-                        break
+                try:
+                    match_result = self.llm.invoke([SystemMessage(content=device_match_prompt)])
+                    matched_device = match_result.content.strip()
+                    
+                    # Validate LLM returned an actual device from the list
+                    if matched_device in user_devices:
+                        extracted["device_id"] = matched_device
+                        print(f"[TicketAgent] LLM matched device: '{matched_device}'")
+                    else:
+                        print(f"[TicketAgent] LLM returned invalid device: '{matched_device}'")
+                except Exception as e:
+                    print(f"[TicketAgent] Device matching error: {e}")
             
             print(f"[TicketAgent] LLM extraction: priority={result.priority}, device_brand={result.device_brand}, device_type={result.device_type}, confidence={result.confidence}")
             return extracted
@@ -962,7 +955,7 @@ Choose: Low, Medium, High, or Critical"""
                     if not any(skip in m.content for skip in [
                         "What category", "Which device", "Priority level", 
                         "Type 'no' to skip", "Ticket Preview", "submit", "edit", "cancel",
-                        "HANDOFF_TO_TICKET_AGENT", "support ticket"
+                        "HANDOFF_TO_TICKET_AGENT"
                     ]):
                         # Truncate long solutions
                         content = m.content[:500] + "..." if len(m.content) > 500 else m.content
@@ -976,6 +969,13 @@ Choose: Low, Medium, High, or Critical"""
             summary_prompt = f"""Summarize this IT support conversation into a concise ticket description.
         Include: the problem reported, troubleshooting steps attempted, and outcome.
         Keep it professional and under 50 words.
+
+        CRITICAL RULES:
+        - ONLY include information explicitly stated in the conversation
+        - DO NOT invent or assume troubleshooting steps that didn't happen
+        - If no troubleshooting occurred, say "No troubleshooting steps performed yet"
+        - DO NOT fabricate technical details
+        - Do not mention device brand/model into the description only mention device type if mentioned
 
         Issue Summary: {ticket.issue_summary or 'Not specified'}
         Category: {ticket.category or 'General'}
