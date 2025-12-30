@@ -5,11 +5,14 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_chroma import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import os
+import logging
 from typing import List, Dict, Optional
 from pydantic import BaseModel, Field
 from src.state import AgentState
 from dotenv import load_dotenv
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 llm = ChatOpenAI(
     model="gpt-4.1-mini",
@@ -30,15 +33,20 @@ def get_global_kb():
 
 class KnowledgeBase:
     def __init__(self, persist_directory: str = "./chroma_db"):
-        self.persist_directory = persist_directory
-        self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-        
-        # Initialize ChromaDB with persistence
-        self.vectorstore = Chroma(
-            collection_name="it_support_kb",
-            embedding_function=self.embeddings,
-            persist_directory=persist_directory
-        )
+        try:
+            self.persist_directory = persist_directory
+            self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+            
+            # Initialize ChromaDB with persistence
+            self.vectorstore = Chroma(
+                collection_name="it_support_kb",
+                embedding_function=self.embeddings,
+                persist_directory=persist_directory
+            )
+            logger.info(f"KnowledgeBase initialized with persist_directory: {persist_directory}")
+        except Exception as e:
+            logger.error(f"Failed to initialize KnowledgeBase: {e}", exc_info=True)
+            raise
 
 class KBDocument(BaseModel):
     """Knowledge Base Document Schema"""
@@ -58,43 +66,55 @@ def load_knowledge_base(kb: KnowledgeBase, json_file: str):
     """Load knowledge documents from JSON file"""
     import json
     
-    with open(json_file, 'r') as f:
-        documents = json.load(f)
-    
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
-        separators=["\n\n", "\n", " ", ""]
-    )
-    
-    for doc in documents:
-        # Create rich text representation for embedding
-        text_content = f"""
-        Title: {doc['title']}
-        Category: {doc['category']}
-        Issue Type: {doc['issue_type']}
-        Symptoms: {', '.join(doc['symptoms'])}
-        Solution: {doc['solution']}
-        Severity: {doc['severity']}
-        Related Errors: {', '.join(doc.get('related_errors', []))}
-        Estimated Time: {doc.get('estimated_time', 'N/A')}
-        """
+    try:
+        with open(json_file, 'r') as f:
+            documents = json.load(f)
         
-        # Split if too long
-        chunks = text_splitter.split_text(text_content)
-        
-        # Store with metadata
-        metadata = {
-            "title": doc['title'],
-            "category": doc['category'],
-            "severity": doc['severity'],
-            "success_rate": doc.get('success_rate', 0.0)
-        }
-        
-        kb.vectorstore.add_texts(
-            texts=chunks,
-            metadatas=[metadata] * len(chunks)
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            separators=["\n\n", "\n", " ", ""]
         )
+        
+        for doc in documents:
+            # Create rich text representation for embedding
+            text_content = f"""
+            Title: {doc['title']}
+            Category: {doc['category']}
+            Issue Type: {doc['issue_type']}
+            Symptoms: {', '.join(doc['symptoms'])}
+            Solution: {doc['solution']}
+            Severity: {doc['severity']}
+            Related Errors: {', '.join(doc.get('related_errors', []))}
+            Estimated Time: {doc.get('estimated_time', 'N/A')}
+            """
+            
+            # Split if too long
+            chunks = text_splitter.split_text(text_content)
+            
+            # Store with metadata
+            metadata = {
+                "title": doc['title'],
+                "category": doc['category'],
+                "severity": doc['severity'],
+                "success_rate": doc.get('success_rate', 0.0)
+            }
+            
+            kb.vectorstore.add_texts(
+                texts=chunks,
+                metadatas=[metadata] * len(chunks)
+            )
+        
+        logger.info(f"Loaded {len(documents)} documents from {json_file}")
+    except FileNotFoundError:
+        logger.error(f"Knowledge base file not found: {json_file}")
+        raise
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in knowledge base file {json_file}: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Error loading knowledge base from {json_file}: {e}", exc_info=True)
+        raise
 
 def search_knowledge(
     kb: KnowledgeBase,
@@ -140,8 +160,8 @@ def search_knowledge(
         similarity = 1 / (1 + score) 
 
         
-        # Debug: print score info
-        print(f"[DEBUG] KB result: L2_dist={score:.4f}, similarity={similarity:.4f}")
+        # Debug: log score info
+        logger.debug(f"KB result: L2_dist={score:.4f}, similarity={similarity:.4f}")
         
         if similarity >= min_similarity:
             formatted_results.append({
@@ -171,9 +191,10 @@ def get_best_solution(
         }
     """
     # Strategy 1: Direct semantic search (with category if available)
+    # NOTE: Raised thresholds to prevent premature solutions for vague queries
     results = search_knowledge(kb, issue_description, category, top_k=3, min_similarity=0.25)
     
-    if results and results[0]["similarity"] >= 0.4:
+    if results and results[0]["similarity"] >= 0.40:
         return {
             "found": True,
             "solutions": results,
@@ -197,7 +218,7 @@ def get_best_solution(
     if conversation_history:
         context = " ".join(conversation_history[-5:])  # Last 5 messages
         enhanced_query = f"{issue_description} {context}"
-        results = search_knowledge(kb, enhanced_query, category=None, top_k=5, min_similarity=0.3)
+        results = search_knowledge(kb, enhanced_query, category=None, top_k=5, min_similarity=0.30)
         
         if results and results[0]["similarity"] >= 0.35:
             return {
@@ -320,7 +341,7 @@ def detect_category(message: str, conversation_context: Optional[List[str]] = No
                     title = result.get("metadata", {}).get("title", "No title")
                     kb_context += f"{i}. [{category}] {title}\n"
         except Exception as e:
-            print(f"[KB] Error during category detection KB search: {e}")
+            logger.warning(f"Error during category detection KB search: {e}")
     
     # LLM-based categorization with KB context
     system_prompt = """You are an IT support category classifier. Analyze the user's message and classify it into ONE of these categories:
@@ -365,13 +386,13 @@ Classify this into the most appropriate category."""
             HumanMessage(content=user_prompt)
         ])
         
-        print(f"[KB] LLM Category Detection: {result.category} (confidence: {result.confidence})")
-        print(f"[KB] Reasoning: {result.reasoning}")
+        logger.info(f"LLM Category Detection: {result.category} (confidence: {result.confidence})")
+        logger.debug(f"Reasoning: {result.reasoning}")
         
         return result.category
         
     except Exception as e:
-        print(f"[KB] LLM category detection failed: {e}. Falling back to keyword matching.")
+        logger.warning(f"LLM category detection failed: {e}. Falling back to keyword matching.")
         # Fallback to simple keyword matching
         return _fallback_keyword_category(message)
 

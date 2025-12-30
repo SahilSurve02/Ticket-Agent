@@ -4,34 +4,29 @@ A professional IT Support interface with multi-agent system integration
 """
 
 import streamlit as st
-from langgraph.graph import StateGraph, END, START
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-from src.state import AgentState, TicketSchema, FORM_TEMPLATES, create_empty_ticket
-from src.nodes import chatbot_node, ticket_collection_node, ticket_confirmation_node, ticket_preview_node, submit_ticket_node
-from src.kb import initialize_kb_with_check, set_global_kb
-from langgraph.checkpoint.memory import MemorySaver
-import uuid
-import os
-from dotenv import load_dotenv
-from datetime import datetime
-from src.db import init_db
+import logging
 import traceback
+import uuid
+from datetime import datetime
+from langgraph.checkpoint.memory import MemorySaver
+from langchain_core.messages import HumanMessage, AIMessage
+from dotenv import load_dotenv
+
+from src.state import TicketSchema, FORM_TEMPLATES, create_empty_ticket
+from src.kb import initialize_kb_with_check, set_global_kb
+from src.db import init_db
+from src.graph import (
+    build_workflow,
+    compile_workflow,
+    create_initial_state,
+    setup_logging
+)
 
 load_dotenv()
 
-# =============================================================================
-# ROUTING CONFIGURATION
-# =============================================================================
-USE_LLM_ROUTING = os.getenv("USE_LLM_ROUTING", "false").lower() == "true"
-
-# Import LLM router if enabled
-if USE_LLM_ROUTING:
-    try:
-        from src.router import route_chatbot_llm, route_ticket_collection_llm, route_confirmation_llm
-        print("[UI ROUTING] Using LLM-based intelligent routing")
-    except ImportError as e:
-        print(f"[UI ROUTING] LLM router not available, falling back to rule-based: {e}")
-        USE_LLM_ROUTING = False
+# Setup logging
+setup_logging(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # PAGE CONFIGURATION
@@ -340,168 +335,11 @@ st.markdown("""
 
 
 # =============================================================================
-# WORKFLOW GRAPH SETUP (Same as main.py)
-# =============================================================================
-
-def route_chatbot_rules(state: AgentState):
-    """
-    Routes from chatbot based on state - Rule-based implementation
-    
-    INDUSTRY-STANDARD: Uses structured escalate_to_ticket flag for 
-    deterministic handoff (replaces fragile string matching)
-    """
-    # STRUCTURED HANDOFF: Check flag FIRST (deterministic, reliable)
-    if state.get("escalate_to_ticket") is True:
-        return "ticket_collection"
-    
-    if state.get("edit_mode"):
-        return "ticket_collection"
-    
-    if state.get("awaiting_ticket_confirmation"):
-        return END
-    
-    if state.get("awaiting_confirmation"):
-        return "ticket_confirmation"
-    
-    ticket_questions = ["category", "device", "priority", "description"]
-    for template in FORM_TEMPLATES.values():
-        ticket_questions.extend(template.get("extra_fields", []))
-    
-    last_question = state.get("last_question")
-    if last_question in ticket_questions:
-        return "ticket_collection"
-    
-    # Legacy fallback: string-based detection (for backward compatibility)
-    messages = state.get("messages", [])
-    if messages:
-        last_msg = messages[-1]
-        if hasattr(last_msg, 'content'):
-            if "HANDOFF_TO_TICKET_AGENT" in last_msg.content or "handoff_to_ticket" in last_msg.content:
-                return "ticket_collection"
-    
-    return END
-
-
-def route_ticket_collection_rules(state: AgentState):
-    """Routes from ticket collection - Rule-based implementation"""
-    if state.get("ticket_collection_complete"):
-        return "ticket_preview"
-    
-    current_ticket = state.get("ticket", {})
-    if isinstance(current_ticket, dict):
-        current_ticket = TicketSchema(**current_ticket)
-    
-    has_category = current_ticket.category is not None
-    has_summary = current_ticket.issue_summary is not None
-    has_device = current_ticket.device_id is not None
-    has_priority = current_ticket.priority is not None
-    has_description = current_ticket.description is not None
-    
-    category = current_ticket.category or "General"
-    template = FORM_TEMPLATES.get(category, FORM_TEMPLATES["General"])
-    required_extras = template.get("extra_fields", [])
-    current_extras = current_ticket.extra_fields or {}
-    has_all_extras = all(field in current_extras for field in required_extras)
-    
-    if has_category and has_summary and has_device and has_priority and has_description and has_all_extras:
-        return "ticket_preview"
-    
-    return END
-
-
-def route_confirmation_rules(state: AgentState):
-    """Routes from confirmation based on user's choice - Rule-based implementation"""
-    action = state.get("confirmation_action", "")
-    
-    if action == "submit":
-        return "submit_ticket"
-    elif action in ["edit", "cancel"]:
-        return END
-    
-    return END
-
-
-def route_chatbot(state: AgentState):
-    """Main chatbot router - uses LLM or rules based on configuration"""
-    if USE_LLM_ROUTING:
-        result = route_chatbot_llm(state)
-        return END if result == "END" else result
-    return route_chatbot_rules(state)
-
-
-def route_ticket_collection(state: AgentState):
-    """Main ticket collection router - uses LLM or rules based on configuration"""
-    if USE_LLM_ROUTING:
-        result = route_ticket_collection_llm(state)
-        return END if result == "END" else result
-    return route_ticket_collection_rules(state)
-
-
-def route_confirmation(state: AgentState):
-    """Main confirmation router - uses LLM or rules based on configuration"""
-    if USE_LLM_ROUTING:
-        result = route_confirmation_llm(state)
-        return END if result == "END" else result
-    return route_confirmation_rules(state)
-
-
-def build_workflow():
-    """Build and return the workflow graph"""
-    workflow = StateGraph(AgentState)
-    
-    # Add nodes
-    workflow.add_node("chatbot", chatbot_node)
-    workflow.add_node("ticket_collection", ticket_collection_node)
-    workflow.add_node("ticket_preview", ticket_preview_node)
-    workflow.add_node("ticket_confirmation", ticket_confirmation_node)
-    workflow.add_node("submit_ticket", submit_ticket_node)
-    
-    # Set entry point
-    workflow.set_entry_point("chatbot")
-    
-    # Add edges
-    workflow.add_conditional_edges(
-        "chatbot",
-        route_chatbot,
-        {
-            "ticket_collection": "ticket_collection",
-            "ticket_confirmation": "ticket_confirmation",
-            END: END
-        }
-    )
-    
-    workflow.add_conditional_edges(
-        "ticket_collection",
-        route_ticket_collection,
-        {
-            "ticket_preview": "ticket_preview",
-            END: END
-        }
-    )
-    
-    workflow.add_edge("ticket_preview", END)
-    
-    workflow.add_conditional_edges(
-        "ticket_confirmation",
-        route_confirmation,
-        {
-            "submit_ticket": "submit_ticket",
-            "ticket_collection": "ticket_collection",
-            END: END
-        }
-    )
-    
-    workflow.add_edge("submit_ticket", END)
-    
-    return workflow
-
-
-# =============================================================================
 # SESSION STATE INITIALIZATION
 # =============================================================================
 
 def initialize_session_state():
-    """Initialize all session state variables"""
+    """Initialize all session state variables with proper exception handling"""
     if "initialized" not in st.session_state:
         # User info (simulated - would come from auth in production)
         st.session_state.user_info = {
@@ -520,37 +358,43 @@ def initialize_session_state():
             "HP Printer LaserJet 200"
         ]
         
-        # Initialize KB
+        # Initialize KB with proper exception handling
+        kb = None
         try:
             kb = initialize_kb_with_check("./chroma_db")
             set_global_kb(kb)
             st.session_state.kb_status = "✓ Connected" if kb else "⚠ Unavailable"
+            if kb:
+                logger.info("Knowledge base initialized successfully")
+            else:
+                logger.warning("Knowledge base unavailable")
         except Exception as e:
             st.session_state.kb_status = f"⚠ Error: {str(e)[:30]}..."
-            print(f"[KB Warning] Could not initialize KB: {e}")
+            logger.error(f"Failed to initialize KB: {e}", exc_info=True)
         
         # Chat history
         st.session_state.messages = []
         
-        # Workflow state
-        st.session_state.thread_id = str(uuid.uuid4())
-        st.session_state.memory = MemorySaver()
-        st.session_state.workflow = build_workflow()
-        st.session_state.app = st.session_state.workflow.compile(
-            checkpointer=st.session_state.memory
-        )
+        # Workflow state with exception handling
+        try:
+            st.session_state.thread_id = str(uuid.uuid4())
+            st.session_state.memory = MemorySaver()
+            st.session_state.workflow = build_workflow()
+            st.session_state.app = compile_workflow(
+                st.session_state.workflow,
+                checkpointer=st.session_state.memory
+            )
+            logger.info("Workflow initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize workflow: {e}", exc_info=True)
+            st.error(f"Failed to initialize workflow: {e}")
+            raise
         
-        # Agent state tracking
-        st.session_state.agent_state = {
-            "user_info": st.session_state.user_info,
-            "user_devices": st.session_state.user_devices,
-            "ticket": create_empty_ticket(),
-            "ticket_preview_shown": False,
-            "awaiting_confirmation": False,
-            "last_question": None,
-            "current_extra_field_index": 0,
-            "detected_category": None
-        }
+        # Agent state tracking - use unified create_initial_state
+        st.session_state.agent_state = create_initial_state(
+            st.session_state.user_info,
+            st.session_state.user_devices
+        )
         
         # Ticket tracking
         st.session_state.current_ticket = None
@@ -924,10 +768,22 @@ def render_message_with_buttons(content: str, message_key: str):
 
 
 def process_user_message(user_input: str):
-    """Process user input through the LangGraph workflow"""
+    """
+    Process user input through the LangGraph workflow.
+    
+    Args:
+        user_input: The user's message text.
+        
+    Returns:
+        List of bot response strings.
+    """
     config = {"configurable": {"thread_id": st.session_state.thread_id}}
     
-    print(f"\n[UI] User input: {user_input[:100]}...")
+    logger.info(f"Processing user input: {user_input[:100]}...")
+    
+    # Validate input
+    if not user_input or not user_input.strip():
+        return ["Please enter a message."]
     
     # Prepare input message
     input_message = {"messages": [HumanMessage(content=user_input)]}
@@ -936,22 +792,25 @@ def process_user_message(user_input: str):
     if st.session_state.first_interaction:
         input_message.update(st.session_state.agent_state)
         st.session_state.first_interaction = False
-        print("[UI] First interaction - including initial state")
+        logger.info("First interaction - including initial state")
     
     # Process through graph
     bot_responses = []
     try:
         for event in st.session_state.app.stream(input_message, config=config):
             for node_name, state_update in event.items():
-                print(f"[UI] Node: {node_name}, Has update: {bool(state_update)}")
+                logger.debug(f"Node: {node_name}, Has update: {bool(state_update)}")
                 
                 if not state_update:
                     continue
                 
-                # Update agent state
-                for key, value in state_update.items():
-                    if key in st.session_state.agent_state:
-                        st.session_state.agent_state[key] = value
+                # Update agent state safely
+                try:
+                    for key, value in state_update.items():
+                        if key in st.session_state.agent_state:
+                            st.session_state.agent_state[key] = value
+                except Exception as e:
+                    logger.warning(f"Failed to update agent state: {e}")
                 
                 # Extract bot messages
                 if "messages" in state_update and state_update["messages"]:
@@ -962,7 +821,7 @@ def process_user_message(user_input: str):
                         # Filter out internal handoff signals
                         if "HANDOFF_TO_TICKET_AGENT" not in content and "handoff_to_ticket" not in content:
                             bot_responses.append(content)
-                            print(f"[UI] Bot response added: {content[:100]}...")
+                            logger.debug(f"Bot response added: {content[:100]}...")
                 
                 # Track ticket status
                 if "ticket" in state_update and state_update["ticket"]:
@@ -971,20 +830,19 @@ def process_user_message(user_input: str):
                 # Track submitted tickets
                 if node_name == "submit_ticket":
                     st.session_state.tickets_submitted += 1
-                    print("[UI] Ticket submitted!")
+                    logger.info("Ticket submitted successfully")
     
     except Exception as e:
-        
-        error_detail = traceback.format_exc()
-        bot_responses.append(f"⚠ Error processing message: {str(e)}")
-        print(f"[UI ERROR] {error_detail}")
+        logger.error(f"Error processing message: {e}", exc_info=True)
+        error_msg = f"⚠ An error occurred while processing your message. Please try again."
+        bot_responses.append(error_msg)
     
     # If no responses, add a fallback message
     if not bot_responses:
         bot_responses.append("I received your message but didn't generate a response. Could you please try rephrasing or providing more details?")
-        print("[UI] No bot responses - using fallback")
+        logger.warning("No bot responses generated - using fallback")
     
-    print(f"[UI] Total responses: {len(bot_responses)}\n")
+    logger.info(f"Total responses: {len(bot_responses)}")
     return bot_responses
 
 
@@ -1373,23 +1231,36 @@ def render_chat():
 # =============================================================================
 
 def main():
-    """Main application entry point"""
-
-    # Initialize DB
-    init_db()
-
-    # Initialize session state
-    initialize_session_state()
+    """Main application entry point with proper exception handling"""
     
-    # Render UI
-    render_sidebar()
-    render_chat()
+    # Initialize DB with exception handling
+    try:
+        init_db()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}", exc_info=True)
+        st.error(f"⚠ Database initialization failed: {e}")
+        # Continue anyway - app may still work for troubleshooting
+
+    # Initialize session state (includes KB and workflow)
+    try:
+        initialize_session_state()
+    except Exception as e:
+        logger.error(f"Failed to initialize session state: {e}", exc_info=True)
+        st.error(f"⚠ Failed to initialize application: {e}")
+        st.stop()
+        return
+    
+    # Render UI with exception handling
+    try:
+        render_sidebar()
+        render_chat()
+    except Exception as e:
+        logger.error(f"UI rendering error: {e}", exc_info=True)
+        st.error(f"⚠ An error occurred while rendering the UI: {e}")
     
     # Footer
     st.divider()
-    # col1, col2, col3 = st.columns([1, 2, 1])
-    # with col2:
-    #     st.caption("🔒 Secure | 🚀 Fast | 🎯 Intelligent")
 
 
 if __name__ == "__main__":
