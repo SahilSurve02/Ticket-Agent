@@ -177,13 +177,28 @@ class LLMRouter:
         This is the key improvement over rule-based routing - it understands
         user INTENT rather than just matching keywords.
         """
+        # NEW (adaptive context):
+        def get_router_context(messages: list, max_messages: int = 8) -> list:
+            """
+            Get optimal context for routing decisions
+            Uses adaptive strategy: first 3 + last 5 for long conversations
+            """
+            if len(messages) <= max_messages:
+                return messages
+            
+            # For long conversations: get initial context + recent context
+            initial_context = messages[:3]  # First 3 messages (original issue)
+            recent_context = messages[-5:]   # Last 5 messages (current state)
+            
+            return initial_context + recent_context
+
         # Extract recent conversation context
-        recent_messages = messages[-5:] if len(messages) > 5 else messages
+        context_messages = get_router_context(messages)
         conversation_context = "\n".join([
-            f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.content[:200]}"
-            for m in recent_messages
-            if hasattr(m, 'content')
-        ])
+    f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.content[:200]}"
+    for m in context_messages
+    if hasattr(m, 'content')
+])
         
         routing_prompt = f"""You are an expert routing agent for an IT support chatbot system.
 Your job is to analyze the conversation and decide the next action.
@@ -191,27 +206,31 @@ Your job is to analyze the conversation and decide the next action.
 CONVERSATION CONTEXT:
 {conversation_context}
 
-ROUTING OPTIONS:
-1. "continue_chat" - The conversation should continue in troubleshooting mode. Choose this if:
-   - User is asking questions or describing problems
-   - User is responding to troubleshooting steps
-   - User is asking for clarification
-   - The conversation is ongoing and not ready for ticket creation
+ROUTING OPTIONS (choose the most appropriate):
 
-2. "ticket_collection" - Hand off to ticket creation. Choose this if:
-   - The assistant has indicated it will transfer to ticket creation
-   - The user explicitly wants to create/file/submit a support ticket
-   - User has given up on troubleshooting ("this isn't working", "I need more help")
-   - The handoff signal is present in the conversation
+1. "wait_for_user" - The bot has asked a question and is waiting for user's response
+   Choose this if:
+   - Bot asked a clarifying question
+   - Bot provided troubleshooting steps and asked "Did this help?"
+   - Bot asked yes/no confirmation question
+   - Conversation is ongoing, waiting for user input
 
-3. "end" - Wait for user input. Choose this if:
-   - A question was asked and we're waiting for user response
-   - The conversation has naturally paused
-   - The assistant asked a yes/no question
+2. "ticket_collection" - Transfer to ticket creation agent
+   Choose this if:
+   - Bot explicitly said it will transfer to ticket creation
+   - User explicitly requested to create/file/submit a ticket
+   - User gave up on troubleshooting ("this isn't working", "I need more help")
+   - Troubleshooting failed and escalation is needed
 
-Analyze the conversation and return the most appropriate route.
-Focus on the INTENT of the latest messages, not just keywords."""
+3. "ticket_confirmation" - User is responding to ticket preview
+   Choose this if:
+   - Bot showed a ticket preview
+   - User is being asked to submit/edit/cancel
+   - Last bot message contains "Ticket Preview"
 
+CRITICAL: Focus on what the LAST assistant message is expecting as a response.
+
+Analyze the conversation and return the most appropriate route."""
         try:
             decision = self.router_llm.invoke([
                 SystemMessage(content=routing_prompt)
@@ -222,9 +241,9 @@ Focus on the INTENT of the latest messages, not just keywords."""
             
             # Map the LLM decision to our enum
             route_mapping = {
-                "continue_chat": ChatbotRoute.END,  # Continue means wait for next input
+                "wait_for_user": ChatbotRoute.END,  # Continue means wait for next input
                 "ticket_collection": ChatbotRoute.TICKET_COLLECTION,
-                "end": ChatbotRoute.END
+                "ticket_confirmation": ChatbotRoute.TICKET_CONFIRMATION
             }
             
             final_route = route_mapping.get(decision.route, ChatbotRoute.END)
@@ -247,23 +266,31 @@ Focus on the INTENT of the latest messages, not just keywords."""
         print(f"\n[ROUTER DEBUG] route_confirmation called")
         print(f"  - user_message: '{user_message[:50]}...'" if len(user_message) > 50 else f"  - user_message: '{user_message}'")
         
-        routing_prompt = f"""You are analyzing a user's response to a ticket confirmation prompt.
-The user was asked to choose: submit, edit, or cancel their IT support ticket.
+        routing_prompt = f"""Analyze user's response to ticket confirmation request.
+
+CONTEXT: The user was shown a ticket preview with all their issue details and asked to choose one of:
+- "submit" to create the ticket
+- "edit" to modify details  
+- "cancel" to abandon the ticket
 
 USER'S RESPONSE: "{user_message}"
 
-What is the user's intent?
-- "submit_ticket" - User wants to submit/confirm/proceed with the ticket
-  (Examples: "submit", "yes", "go ahead", "looks good", "confirm", "ok create it", "proceed")
-- "edit" - User wants to modify/change/update the ticket details
-  (Examples: "edit", "change", "modify", "wait I need to fix", "update the priority")
-- "cancel" - User wants to cancel/abandon the ticket
-  (Examples: "cancel", "no", "nevermind", "forget it", "stop", "I don't want it")
-- "invalid" - The response doesn't clearly indicate any of the above
-  (Examples: random text, questions, unrelated content)
+Determine their intent:
 
-Return the most appropriate action based on user intent."""
+1. "submit_ticket" - User wants to proceed/confirm/submit
+   Examples: "yes", "submit", "go ahead", "looks good", "ok", "create it", "yes please", "confirm"
+   
+2. "edit" - User wants to modify something
+   Examples: "edit", "change priority", "wait let me fix", "change device to iPad", "make it high priority"
+   IMPORTANT: If user mentions changing a specific field, classify as "edit"
+   
+3. "cancel" - User wants to abort/stop
+   Examples: "no", "cancel", "nevermind", "forget it", "stop", "don't create it"
+   
+4. "invalid" - Unclear response, need to ask again
+   Examples: random text, off-topic questions, "what?", "huh?", "tell me more"
 
+Return the most appropriate action based on user's clear intent."""
         try:
             decision = self.router_llm.invoke([
                 SystemMessage(content=routing_prompt)

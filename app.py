@@ -38,30 +38,32 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS - Gemini AI Inspired Design
+# Custom CSS - Modern AI-Inspired Design
 st.markdown("""
 <style>
-    /* === GEMINI-INSPIRED CLEAN DARK THEME === */
+    /* === MODERN PREMIUM DARK THEME === */
     
-    /* Main app background */
+    /* Main app background with subtle gradient */
     .stApp {
-        background-color: #1e1e1e;
+        background: linear-gradient(180deg, #0f0f0f 0%, #1a1a1a 50%, #1e1e1e 100%);
+        background-attachment: fixed;
     }
     
-    /* Main content area */
+    /* Main content area with better spacing */
     .main .block-container {
-        padding: 2rem 3rem;
-        max-width: 1200px;
+        padding: 2.5rem 3.5rem;
+        max-width: 1300px;
     }
     
     /* === SIDEBAR STYLING === */
     section[data-testid="stSidebar"] {
-        background-color: #171717;
-        border-right: 1px solid #2d2d2d;
+        background: linear-gradient(180deg, #0d0d0d 0%, #171717 100%);
+        border-right: 2px solid transparent;
+        border-image: linear-gradient(180deg, #6366f1 0%, #8b5cf6 50%, transparent 100%) 1;
     }
     
     section[data-testid="stSidebar"] > div {
-        padding: 1.5rem 1rem;
+        padding: 1.75rem 1.25rem;
     }
     
     /* Sidebar headings */
@@ -112,16 +114,16 @@ st.markdown("""
     /* === CHAT MESSAGES === */
     .stChatMessage {
         background-color: transparent !important;
-        padding: 1.5rem 0;
+        padding: 2rem 0;
         border-radius: 0;
         border: none;
-        animation: fadeInUp 0.4s ease-out;
+        animation: fadeInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     }
     
     @keyframes fadeInUp {
         from {
             opacity: 0;
-            transform: translateY(10px);
+            transform: translateY(20px);
         }
         to {
             opacity: 1;
@@ -150,100 +152,142 @@ st.markdown("""
     
     /* === BUTTONS === */
     .stButton button {
-        background-color: #2d2d2d;
-        color: #e5e7eb;
-        border: 1px solid #3d3d3d;
-        border-radius: 20px;
-        padding: 0.65rem 1.5rem;
-        font-size: 0.875rem;
-        font-weight: 500;
-        transition: all 0.2s ease;
+        background: linear-gradient(135deg, #2d2d2d 0%, #252525 100%);
+        color: #f0f0f0;
+        border: 1.5px solid #3d3d3d;
+        border-radius: 24px;
+        padding: 0.75rem 2rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         height: auto;
+        letter-spacing: 0.02em;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .stButton button::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.1);
+        transform: translate(-50%, -50%);
+        transition: width 0.6s, height 0.6s;
+    }
+    
+    .stButton button:hover::before {
+        width: 300px;
+        height: 300px;
     }
     
     .stButton button:hover {
-        background-color: #3d3d3d;
-        border-color: #4d4d4d;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        background: linear-gradient(135deg, #3d3d3d 0%, #2d2d2d 100%);
+        border-color: #6366f1;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(99, 102, 241, 0.25), 0 0 0 1px rgba(99, 102, 241, 0.1);
     }
     
-    /* Primary button */
+    /* Primary button with enhanced gradient */
     .stButton button[kind="primary"] {
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
         color: white;
         border: none;
-        font-weight: 600;
+        font-weight: 700;
+        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
     }
     
     .stButton button[kind="primary"]:hover {
-        background: linear-gradient(135deg, #5558e3 0%, #7c3aed 100%);
-        box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+        background: linear-gradient(135deg, #5558e3 0%, #7c3aed 50%, #9333ea 100%);
+        box-shadow: 0 8px 24px rgba(99, 102, 241, 0.5), 0 0 40px rgba(139, 92, 246, 0.3);
+        transform: translateY(-3px);
     }
     
     /* === CHAT INPUT === */
     .stChatInput {
-        border-top: 1px solid #2d2d2d;
-        padding-top: 1rem;
+        border-top: 2px solid #2d2d2d;
+        padding-top: 1.5rem;
+        margin-top: 1rem;
     }
     
     .stChatInput > div {
-        background-color: #2d2d2d;
-        border: 1px solid #3d3d3d;
-        border-radius: 24px;
-        padding: 0.5rem 1rem;
+        background: linear-gradient(135deg, #2d2d2d 0%, #252525 100%);
+        border: 2px solid #3d3d3d;
+        border-radius: 28px;
+        padding: 0.75rem 1.5rem;
+        transition: all 0.3s ease;
     }
     
     .stChatInput textarea {
-        color: #e5e7eb;
-        font-size: 0.95rem;
+        color: #f0f0f0;
+        font-size: 1rem;
+        line-height: 1.6;
     }
     
     .stChatInput > div:focus-within {
         border-color: #6366f1;
-        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25), 0 8px 24px rgba(99, 102, 241, 0.15);
+        background: linear-gradient(135deg, #323232 0%, #2a2a2a 100%);
+        transform: translateY(-1px);
     }
     
     /* === HEADERS === */
     h1 {
-        color: #f9fafb;
-        font-size: 1.75rem;
-        font-weight: 600;
-        margin-bottom: 0.25rem;
+        color: #ffffff;
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        letter-spacing: -0.02em;
     }
     
-    h2, h3 {
+    h2 {
+        color: #f0f0f0;
+        font-weight: 700;
+        font-size: 1.5rem;
+        letter-spacing: -0.01em;
+    }
+    
+    h3 {
         color: #e5e7eb;
         font-weight: 600;
+        font-size: 1.25rem;
     }
     
     /* Caption text */
     .stCaption {
-        color: #9ca3af;
+        color: #a1a1aa;
         font-size: 0.875rem;
+        line-height: 1.5;
     }
     
     /* === ALERTS & INFO BOXES === */
     .stAlert {
-        background-color: #252525;
-        border: 1px solid #3d3d3d;
-        border-radius: 12px;
-        color: #e5e7eb;
+        background: linear-gradient(135deg, #252525 0%, #1e1e1e 100%);
+        border: 1.5px solid #3d3d3d;
+        border-radius: 16px;
+        color: #f0f0f0;
+        padding: 1rem 1.25rem;
     }
     
     .stSuccess {
-        background-color: rgba(34, 197, 94, 0.1);
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.05) 100%);
         border-left: 4px solid #22c55e;
+        box-shadow: 0 0 20px rgba(34, 197, 94, 0.1);
     }
     
     .stWarning {
-        background-color: rgba(251, 146, 60, 0.1);
+        background: linear-gradient(135deg, rgba(251, 146, 60, 0.15) 0%, rgba(251, 146, 60, 0.05) 100%);
         border-left: 4px solid #fb923c;
+        box-shadow: 0 0 20px rgba(251, 146, 60, 0.1);
     }
     
     .stInfo {
-        background-color: rgba(59, 130, 246, 0.1);
-        border-left: 4px solid #3b82f6;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(99, 102, 241, 0.05) 100%);
+        border-left: 4px solid #6366f1;
+        box-shadow: 0 0 20px rgba(99, 102, 241, 0.1);
     }
     
     /* === CUSTOM CONTAINERS === */
@@ -258,40 +302,44 @@ st.markdown("""
     
     /* === SCROLLBAR === */
     ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+        width: 10px;
+        height: 10px;
     }
     
     ::-webkit-scrollbar-track {
-        background: #171717;
+        background: #0f0f0f;
+        border-radius: 10px;
     }
     
     ::-webkit-scrollbar-thumb {
-        background: #3d3d3d;
-        border-radius: 4px;
+        background: linear-gradient(180deg, #6366f1 0%, #8b5cf6 100%);
+        border-radius: 10px;
+        border: 2px solid #0f0f0f;
     }
     
     ::-webkit-scrollbar-thumb:hover {
-        background: #4d4d4d;
+        background: linear-gradient(180deg, #5558e3 0%, #7c3aed 100%);
+        box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
     }
     
     /* === SELECTION BUTTONS (Device, Category, Priority) === */
     div[data-testid="column"] .stButton button {
         width: 100%;
-        background-color: #252525;
-        border: 1px solid #3d3d3d;
-        border-radius: 12px;
-        padding: 1rem;
-        font-size: 0.9rem;
-        font-weight: 500;
+        background: linear-gradient(135deg, #252525 0%, #1e1e1e 100%);
+        border: 2px solid #3d3d3d;
+        border-radius: 16px;
+        padding: 1.25rem;
+        font-size: 0.95rem;
+        font-weight: 600;
         text-align: center;
-        min-height: 60px;
+        min-height: 70px;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: all 0.2s ease;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         position: relative;
         overflow: hidden;
+        letter-spacing: 0.01em;
     }
     
     div[data-testid="column"] .stButton button::before {
@@ -302,21 +350,21 @@ st.markdown("""
         width: 0;
         height: 0;
         border-radius: 50%;
-        background: rgba(99, 102, 241, 0.1);
+        background: radial-gradient(circle, rgba(99, 102, 241, 0.3) 0%, rgba(99, 102, 241, 0) 70%);
         transform: translate(-50%, -50%);
-        transition: width 0.3s, height 0.3s;
+        transition: width 0.5s, height 0.5s;
     }
     
     div[data-testid="column"] .stButton button:hover::before {
-        width: 300px;
-        height: 300px;
+        width: 400px;
+        height: 400px;
     }
     
     div[data-testid="column"] .stButton button:hover {
-        background-color: #2d2d2d;
+        background: linear-gradient(135deg, #2d2d2d 0%, #252525 100%);
         border-color: #6366f1;
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
+        transform: translateY(-3px) scale(1.02);
+        box-shadow: 0 12px 32px rgba(99, 102, 241, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.2);
     }
     
     /* === MARKDOWN STYLING === */
@@ -902,68 +950,35 @@ def get_ticket_status():
 def render_sidebar():
     """Render the sidebar with user info and session stats"""
     with st.sidebar:
-        # === MODERN HEADER ===
-        st.markdown("""
-<div style="
-    text-align: center;
-    padding: 1rem 0 1.5rem 0;
-    border-bottom: 1px solid #3d3d3d;
-    margin-bottom: 1.5rem;
-">
-    <div style="font-size: 1.75rem; margin-bottom: 0.25rem;">🎫</div>
-    <div style="font-size: 1.1rem; font-weight: 700; color: #f9fafb;">IT Support</div>
-    <div style="font-size: 0.75rem; color: #6366f1; margin-top: 0.25rem;">Multi-Agent AI</div>
-</div>
-        """, unsafe_allow_html=True)
+        # === BEAUTIFUL ANIMATED LOGO ===
+        st.markdown(
+            '<div style="text-align: center; padding: 1.5rem 0 2rem 0; border-bottom: 2px solid #6366f1; margin-bottom: 2rem;">'
+            '<div style="font-size: 3.5rem; filter: drop-shadow(0 0 20px rgba(99, 102, 241, 0.6));">🎫</div>'
+            '<div style="font-size: 1.3rem; font-weight: 800; background: linear-gradient(135deg, #6366f1, #8b5cf6, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 0.4rem;">IT SUPPORT</div>'
+            '<div style="font-size: 0.75rem; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.15em; font-weight: 600;">'
+            '<span style="color: #6366f1;">◆</span> Multi-Agent AI <span style="color: #8b5cf6;">◆</span>'
+            '</div>'
+            '</div>',
+            unsafe_allow_html=True
+        )
         
         # === USER PROFILE CARD ===
         user = st.session_state.user_info
-        st.markdown("""
-<div style="
-    background: linear-gradient(135deg, #2d2d2d 0%, #252525 100%);
-    border: 1px solid #3d3d3d;
-    border-radius: 12px;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-">
-    <div style="display: flex; align-items: center; margin-bottom: 0.75rem;">
-        <div style="
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.25rem;
-            margin-right: 0.75rem;
-        ">👤</div>
-        <div>
-            <div style="font-size: 0.95rem; font-weight: 600; color: #f9fafb;">{}</div>
-            <div style="font-size: 0.7rem; color: #9ca3af;">{}</div>
-        </div>
-    </div>
-    <div style="
-        padding: 0.75rem;
-        background-color: #1e1e1e;
-        border-radius: 8px;
-        font-size: 0.75rem;
-        line-height: 1.8;
-        color: #9ca3af;
-    ">
-        <div style="margin-bottom: 0.3rem;">📧 {}</div>
-        <div style="margin-bottom: 0.3rem;">📞 {}</div>
-        <div>🆔 {}</div>
-    </div>
-</div>
-        """.format(
-            user['user_name'],
-            user['department'],
-            user['email'],
-            user['phone'],
-            user['user_id']
-        ), unsafe_allow_html=True)
+        st.markdown(
+            '<div style="background: rgba(99, 102, 241, 0.1); border: 2px solid #6366f1; border-radius: 16px; padding: 1.25rem; margin-bottom: 2rem;">'
+            '<div style="display: flex; align-items: center; margin-bottom: 1rem;">'
+            '<div style="width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #8b5cf6); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-right: 1rem;">👤</div>'
+            '<div>'
+            '<div style="font-size: 1.05rem; font-weight: 700; color: #ffffff;">' + user['user_name'] + '</div>'
+            '<div style="font-size: 0.75rem; color: #a1a1aa;">' + user['department'] + '</div>'
+            '</div></div>'
+            '<div style="padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 12px; font-size: 0.8rem; color: #d4d4d8;">'
+            '<div style="margin-bottom: 0.4rem;">📧 ' + user['email'] + '</div>'
+            '<div style="margin-bottom: 0.4rem;">📞 ' + user['phone'] + '</div>'
+            '<div>🆔 ' + user['user_id'] + '</div>'
+            '</div></div>',
+            unsafe_allow_html=True
+        )
         
         # === SESSION METRICS GRID ===
         duration = datetime.now() - st.session_state.session_start
@@ -972,61 +987,26 @@ def render_sidebar():
         status_label = "Active" if "In Progress" in status else "Idle"
         status_color = "#fb923c" if "Active" in status_label else "#6366f1"
         
-        st.markdown("""
-<div style="
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
-">
-    <div style="
-        background-color: #252525;
-        border: 1px solid #3d3d3d;
-        border-radius: 10px;
-        padding: 0.75rem;
-        text-align: center;
-    ">
-        <div style="font-size: 1.5rem; font-weight: 700; color: #6366f1;">{}</div>
-        <div style="font-size: 0.7rem; color: #9ca3af; margin-top: 0.25rem;">TICKETS</div>
-    </div>
-    <div style="
-        background-color: #252525;
-        border: 1px solid #3d3d3d;
-        border-radius: 10px;
-        padding: 0.75rem;
-        text-align: center;
-    ">
-        <div style="font-size: 1.5rem; font-weight: 700; color: #8b5cf6;">{}</div>
-        <div style="font-size: 0.7rem; color: #9ca3af; margin-top: 0.25rem;">MESSAGES</div>
-    </div>
-    <div style="
-        background-color: #252525;
-        border: 1px solid #3d3d3d;
-        border-radius: 10px;
-        padding: 0.75rem;
-        text-align: center;
-    ">
-        <div style="font-size: 1.5rem; font-weight: 700; color: #22c55e;">{} min</div>
-        <div style="font-size: 0.7rem; color: #9ca3af; margin-top: 0.25rem;">TIME</div>
-    </div>
-    <div style="
-        background-color: #252525;
-        border: 1px solid #3d3d3d;
-        border-radius: 10px;
-        padding: 0.75rem;
-        text-align: center;
-    ">
-        <div style="font-size: 1.5rem; font-weight: 700; color: {};">{}</div>
-        <div style="font-size: 0.7rem; color: #9ca3af; margin-top: 0.25rem;">STATUS</div>
-    </div>
-</div>
-        """.format(
-            st.session_state.tickets_submitted,
-            len(st.session_state.messages),
-            minutes,
-            status_color,
-            status_label
-        ), unsafe_allow_html=True)
+        tickets_val = st.session_state.tickets_submitted
+        messages_val = len(st.session_state.messages)
+        
+        st.markdown(
+            '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; margin-bottom: 2rem;">'
+            '<div style="background: rgba(99, 102, 241, 0.12); border: 2px solid rgba(99, 102, 241, 0.3); border-radius: 14px; padding: 1rem; text-align: center;">'
+            f'<div style="font-size: 1.75rem; font-weight: 800; color: #6366f1;">{tickets_val}</div>'
+            '<div style="font-size: 0.65rem; color: #a1a1aa; margin-top: 0.35rem; font-weight: 700;">TICKETS</div></div>'
+            '<div style="background: rgba(139, 92, 246, 0.12); border: 2px solid rgba(139, 92, 246, 0.3); border-radius: 14px; padding: 1rem; text-align: center;">'
+            f'<div style="font-size: 1.75rem; font-weight: 800; color: #8b5cf6;">{messages_val}</div>'
+            '<div style="font-size: 0.65rem; color: #a1a1aa; margin-top: 0.35rem; font-weight: 700;">MESSAGES</div></div>'
+            '<div style="background: rgba(34, 197, 94, 0.12); border: 2px solid rgba(34, 197, 94, 0.3); border-radius: 14px; padding: 1rem; text-align: center;">'
+            f'<div style="font-size: 1.75rem; font-weight: 800; color: #22c55e;">{minutes} min</div>'
+            '<div style="font-size: 0.65rem; color: #a1a1aa; margin-top: 0.35rem; font-weight: 700;">TIME</div></div>'
+            '<div style="background: rgba(251, 146, 60, 0.12); border: 2px solid rgba(251, 146, 60, 0.3); border-radius: 14px; padding: 1rem; text-align: center;">'
+            f'<div style="font-size: 1.75rem; font-weight: 800; color: {status_color};">{status_label}</div>'
+            '<div style="font-size: 0.65rem; color: #a1a1aa; margin-top: 0.35rem; font-weight: 700;">STATUS</div></div>'
+            '</div>',
+            unsafe_allow_html=True
+        )
         
         # === KNOWLEDGE BASE STATUS ===
         kb_connected = "✓" in st.session_state.kb_status
@@ -1035,49 +1015,27 @@ def render_sidebar():
         kb_bg = "rgba(34, 197, 94, 0.15)" if kb_connected else "rgba(251, 146, 60, 0.15)"
         kb_border = "#22c55e" if kb_connected else "#fb923c"
         
-        st.markdown("""
-<div style="
-    background: {};
-    border: 1px solid {};
-    border-radius: 10px;
-    padding: 0.75rem;
-    margin-bottom: 1.5rem;
-    text-align: center;
-">
-    <div style="font-size: 0.7rem; color: #9ca3af; margin-bottom: 0.25rem;">KNOWLEDGE BASE</div>
-    <div style="font-size: 0.9rem; font-weight: 600; color: #f9fafb;">{} {}</div>
-</div>
-        """.format(kb_bg, kb_border, kb_icon, kb_text), unsafe_allow_html=True)
+        st.markdown(
+            f'<div style="background: {kb_bg}; border: 2px solid {kb_border}; border-radius: 14px; padding: 1rem; margin-bottom: 2rem; text-align: center;">'
+            f'<div style="font-size: 0.65rem; color: #a1a1aa; margin-bottom: 0.4rem; font-weight: 700;">KNOWLEDGE BASE</div>'
+            f'<div style="font-size: 1rem; font-weight: 700; color: #ffffff;">{kb_icon} {kb_text}</div>'
+            '</div>',
+            unsafe_allow_html=True
+        )
         
         # === DEVICES SECTION ===
-        st.markdown("""
-<div style="
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: #9ca3af;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.75rem;
-    padding-left: 0.25rem;
-">💻 Your Devices</div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            '<div style="font-size: 0.7rem; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem; padding-left: 0.25rem;">💻 Your Devices</div>',
+            unsafe_allow_html=True
+        )
         
         with st.expander("🔽 View All Devices", expanded=False):
             for idx, device in enumerate(st.session_state.user_devices):
                 icon = "🖥️" if any(x in device for x in ["Dell", "HP", "MacBook"]) else ("📱" if any(x in device for x in ["iPad", "iPhone"]) else "🖨️")
-                st.markdown(f"""
-<div style="
-    background-color: #252525;
-    border: 1px solid #3d3d3d;
-    border-radius: 6px;
-    padding: 0.5rem 0.75rem;
-    margin-bottom: 0.5rem;
-    font-size: 0.8rem;
-    color: #e5e7eb;
-">
-    {icon} {device}
-</div>
-                """, unsafe_allow_html=True)
+                st.markdown(
+                    f'<div style="background-color: #252525; border: 1px solid #3d3d3d; border-radius: 6px; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; font-size: 0.8rem; color: #e5e7eb;">{icon} {device}</div>',
+                    unsafe_allow_html=True
+                )
         
         # === ACTIONS ===
         st.markdown("<br>", unsafe_allow_html=True)
@@ -1093,79 +1051,55 @@ def render_sidebar():
 
 def render_chat():
     """Render the main chat interface"""
-    # Glowing title with special OF emphasis
-    st.markdown("""
-<div style="text-align: center; margin-bottom: 1rem;">
-    <h1 style="
-        margin: 0;
-        padding: 0;
-        font-size: 2rem;
-        font-weight: 700;
-        letter-spacing: 0.02em;
-    ">
-        <span style="
-            display: inline-block;
-            background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            filter: drop-shadow(0 0 20px rgba(222, 115, 22, 0.6)) drop-shadow(0 0 40px rgba(145, 158, 11, 0.4));
-            animation: glow 2s ease-in-out infinite alternate;
-            font-weight: 800;
-        ">OF IT Support Chatbot</span>
-    </h1>
-</div>
-<style>
-    @keyframes glow {
-        from {
-            filter: drop-shadow(0 0 15px rgba(249, 115, 22, 0.5)) drop-shadow(0 0 30px rgba(245, 158, 11, 0.3));
-        }
-        to {
-            filter: drop-shadow(0 0 25px rgba(249, 115, 22, 0.8)) drop-shadow(0 0 50px rgba(245, 158, 11, 0.6));
-        }
-    }
-</style>
-    """, unsafe_allow_html=True)
-    # st.caption("Powered by Multi-Agent AI System | LangGraph + GPT-4")
-    # st.markdown("<br>", unsafe_allow_html=True)
+    # Beautiful animated main logo - using components for better rendering
+    st.markdown(
+        '<div style="text-align: center; margin: 2rem 0 3rem 0;">'
+        '<div style="font-size: 5rem; margin-bottom: 1rem; filter: drop-shadow(0 0 30px rgba(99, 102, 241, 0.8));">🎫</div>'
+        '<h1 style="margin: 0; font-size: 2.75rem; font-weight: 900;">'
+        '<span style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">IT SUPPORT</span>'
+        '</h1>'
+        '<div style="margin-top: 0.75rem; font-size: 1rem; color: #a1a1aa; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;">'
+        '<span style="color: #6366f1;">◆</span> AI-Powered Chatbot <span style="color: #8b5cf6;">◆</span>'
+        '</div>'
+        '<div style="width: 200px; height: 3px; background: linear-gradient(90deg, transparent, #6366f1, #8b5cf6, #a855f7, transparent); margin: 1.5rem auto 0; border-radius: 2px;"></div>'
+        '</div>',
+        unsafe_allow_html=True
+    )
     
     # Welcome message if no messages
     if not st.session_state.messages:
-        st.markdown("""
-<div style="
-    background-color: #252525;
-    padding: 2rem;
-    border-radius: 16px;
-    border: 1px solid #3d3d3d;
-    margin: 2rem 0;
-    text-align: center;
-">
-    <h2 style="margin-top: 0; color: #f9fafb; font-size: 1.5rem;">👋 Welcome!</h2>
-    <p style="line-height: 1.8; color: #9ca3af; margin-bottom: 1.5rem; font-size: 0.95rem;">
-        I'm your AI-powered IT assistant, ready to help with your technical issues.
-    </p>
-    <div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; margin-top: 1.5rem;">
-        <div style="flex: 1; min-width: 150px; max-width: 200px;">
-            <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🔍</div>
-            <div style="color: #e5e7eb; font-size: 0.85rem;">Search KB</div>
-        </div>
-        <div style="flex: 1; min-width: 150px; max-width: 200px;">
-            <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🛠️</div>
-            <div style="color: #e5e7eb; font-size: 0.85rem;">Troubleshoot</div>
-        </div>
-        <div style="flex: 1; min-width: 150px; max-width: 200px;">
-            <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🎫</div>
-            <div style="color: #e5e7eb; font-size: 0.85rem;">Create Tickets</div>
-        </div>
-    </div>
-    <p style="margin-top: 1.5rem; margin-bottom: 0; color: #6366f1; font-weight: 500; font-size: 0.9rem;">
-        Describe your problem to get started
-    </p>
-</div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            '<div style="background: rgba(99, 102, 241, 0.15); padding: 3rem 2rem; border-radius: 24px; border: 2px solid rgba(99, 102, 241, 0.4); margin: 2rem auto; text-align: center; max-width: 1000px;">'
+            '<h2 style="margin-top: 0; margin-bottom: 1rem; color: #ffffff; font-size: 2rem; font-weight: 800;">👋 Welcome!</h2>'
+            '<p style="line-height: 1.8; color: #e5e7eb; margin-bottom: 2.5rem; font-size: 1.1rem; max-width: 600px; margin-left: auto; margin-right: auto;">'
+            "I'm your AI-powered IT assistant, ready to help with your technical issues."
+            '</p>'
+            '<div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; margin-top: 2rem;">'
+            '<div style="flex: 1; min-width: 160px; max-width: 220px; background: rgba(99, 102, 241, 0.2); padding: 1.5rem 1rem; border-radius: 16px; border: 2px solid rgba(99, 102, 241, 0.4);">'
+            '<div style="font-size: 2.5rem; margin-bottom: 0.75rem;">🔍</div>'
+            '<div style="color: #ffffff; font-size: 0.95rem; font-weight: 700;">Search KB</div></div>'
+            '<div style="flex: 1; min-width: 160px; max-width: 220px; background: rgba(139, 92, 246, 0.2); padding: 1.5rem 1rem; border-radius: 16px; border: 2px solid rgba(139, 92, 246, 0.4);">'
+            '<div style="font-size: 2.5rem; margin-bottom: 0.75rem;">🛠️</div>'
+            '<div style="color: #ffffff; font-size: 0.95rem; font-weight: 700;">Troubleshoot</div></div>'
+            '<div style="flex: 1; min-width: 160px; max-width: 220px; background: rgba(168, 85, 247, 0.2); padding: 1.5rem 1rem; border-radius: 16px; border: 2px solid rgba(168, 85, 247, 0.4);">'
+            '<div style="font-size: 2.5rem; margin-bottom: 0.75rem;">🎫</div>'
+            '<div style="color: #ffffff; font-size: 0.95rem; font-weight: 700;">Create Tickets</div></div>'
+            '</div>'
+            '<p style="margin-top: 2.5rem; margin-bottom: 0; background: linear-gradient(90deg, #818cf8, #a78bfa, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 800; font-size: 1.1rem;">'
+            '✨ Describe your problem to get started'
+            '</p>'
+            '</div>',
+            unsafe_allow_html=True
+        )
     
     # Chat messages container
     chat_container = st.container()
+    
+    # Find the index of the last assistant message
+    last_assistant_idx = -1
+    for idx, message in enumerate(st.session_state.messages):
+        if message["role"] == "assistant":
+            last_assistant_idx = idx
     
     with chat_container:
         # Display chat history
@@ -1174,12 +1108,17 @@ def render_chat():
             content = message["content"]
             
             with st.chat_message(role):
-                # For assistant messages, check if they have interactive elements
+                # For assistant messages, only show interactive buttons on the LAST message
                 if role == "assistant":
-                    button_response = render_message_with_buttons(content, f"msg_{idx}")
-                    if button_response:
-                        # User clicked a button - treat it as input
-                        st.session_state.pending_input = button_response
+                    if idx == last_assistant_idx:
+                        # Last assistant message - show interactive buttons
+                        button_response = render_message_with_buttons(content, f"msg_{idx}")
+                        if button_response:
+                            # User clicked a button - treat it as input
+                            st.session_state.pending_input = button_response
+                    else:
+                        # Previous assistant messages - just show text, no buttons
+                        st.markdown(content)
                 else:
                     st.markdown(content)
     

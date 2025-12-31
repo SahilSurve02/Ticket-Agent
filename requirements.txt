@@ -8,6 +8,7 @@ langchain-community
 # Data Processing
 pydantic
 python-dotenv
+colorlog
 
 # Vector Database & Embeddings
 chromadb

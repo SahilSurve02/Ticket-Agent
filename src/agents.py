@@ -102,7 +102,7 @@ Feel free to ask me anything else!"""
                 response_lower = user_message.lower().strip()
                 
                 # User confirms ticket creation
-                if any(word in response_lower for word in ["yes", "yeah", "yep", "sure", "ok", "okay", "please", "yup"]):
+                if any(word in response_lower for word in ["yes", "yeah", "yep", "sure", "ok", "okay", "please", "yup", "create", "go ahead", "do it", "confirm", "proceed", "sure"]):
                     msg = "I'll transfer you to our Ticket Agent to create a support ticket."
                     logger.info("User confirmed ticket creation, handing off to TicketAgent")
                     
@@ -152,7 +152,7 @@ Feel free to ask me anything else!"""
                     }
                 
                 # User declines ticket creation
-                elif any(word in response_lower for word in ["no", "nope", "nah", "cancel", "nevermind", "never mind"]):
+                elif any(word in response_lower for word in ["no", "nope", "nah", "cancel", "nevermind", "never mind", "don't", "do not", "stop", "not now", "later", "skip"]):
                     msg = "No problem! Is there anything else I can help you with?"
                     logger.info("User declined ticket creation, staying in chatbot mode")
                     return {
@@ -326,6 +326,8 @@ This chatbot should ONLY REJECT requests that are clearly in OTHER SPECIFIC DOMA
 CRITICAL DISAMBIGUATION:
 - "book a ticket for my laptop" → IT SUPPORT (laptop = IT device, means create support ticket) → YES
 - "book a ticket to Paris" → TRAVEL (destination = travel intent) → NO
+- "file a ticket for London" → TRAVEL (trip = travel intent) → NO
+- "file a ticket for my computer issue" → IT SUPPORT (computer = IT device) → YES
 - "file a ticket" → IT SUPPORT (IT context) → YES
 - "create ticket" → IT SUPPORT (IT context) → YES
 - "book flight" → TRAVEL → NO

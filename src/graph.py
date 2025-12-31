@@ -33,6 +33,7 @@ load_dotenv()
 # LOGGING CONFIGURATION
 # =============================================================================
 logger = logging.getLogger(__name__)
+_logging_configured = False  # Flag to prevent duplicate setup
 
 
 # =============================================================================
@@ -424,13 +425,24 @@ def create_initial_state(
 
 def setup_logging(level: int = logging.INFO, log_file: str = "Logs/app.log") -> None:
     """
-    Configure logging for the workflow module.
+    Configure logging for the workflow module with colorful console output.
     
     Args:
         level: Logging level (default: INFO).
         log_file: Path to log file (default: Logs/app.log).
     """
+    global _logging_configured
+    
+    # Prevent duplicate configuration
+    if _logging_configured:
+        return
+    
     import os
+    try:
+        from colorlog import ColoredFormatter
+        use_colors = True
+    except ImportError:
+        use_colors = False
     
     # Ensure Logs directory exists
     log_dir = os.path.dirname(log_file)
@@ -444,31 +456,51 @@ def setup_logging(level: int = logging.INFO, log_file: str = "Logs/app.log") -> 
     # Clear existing handlers to avoid duplicates
     root_logger.handlers.clear()
     
-    # Create formatters
-    formatter = logging.Formatter(
+    # Create plain formatter for file logging
+    file_formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     
-    # File handler - logs everything to file
+    # File handler - logs everything to file without colors
     file_handler = logging.FileHandler(log_file, encoding='utf-8')
     file_handler.setLevel(level)
-    file_handler.setFormatter(formatter)
+    file_handler.setFormatter(file_formatter)
     root_logger.addHandler(file_handler)
     
-    # Console handler - logs to stdout
+    # Console handler - logs to stdout with colors
     console_handler = logging.StreamHandler()
     console_handler.setLevel(level)
-    console_handler.setFormatter(formatter)
+    
+    if use_colors:
+        # Colorful formatter for console
+        color_formatter = ColoredFormatter(
+            '%(log_color)s%(asctime)s%(reset)s - %(cyan)s%(name)s%(reset)s - %(log_color)s%(levelname)s%(reset)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S',
+            log_colors={
+                'DEBUG': 'white',
+                'INFO': 'green',
+                'WARNING': 'yellow',
+                'ERROR': 'red',
+                'CRITICAL': 'bold_red',
+            },
+            secondary_log_colors={},
+            style='%'
+        )
+        console_handler.setFormatter(color_formatter)
+    else:
+        console_handler.setFormatter(file_formatter)
+    
     root_logger.addHandler(console_handler)
     
     # Also set level for this module's logger
     logger.setLevel(level)
+    
+    # Disable propagation for child loggers to prevent duplicates
+    for log_name in ['src.nodes', 'src.agents', 'src.kb', 'src.router', 'src.db']:
+        child_logger = logging.getLogger(log_name)
+        child_logger.propagate = True  # Allow propagation to root
+        child_logger.handlers.clear()  # But clear any duplicate handlers
+    
+    _logging_configured = True
     logger.info(f"Logging initialized. Log file: {log_file}")
-
-
-# Log routing configuration on module load
-if get_use_llm_routing():
-    logger.info("[ROUTING] LLM-based intelligent routing enabled")
-else:
-    logger.info("[ROUTING] Using rule-based routing")
