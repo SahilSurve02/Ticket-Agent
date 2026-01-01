@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from src.state import AgentState, TicketSchema, FORM_TEMPLATES, create_empty_ticket, generate_ticket_id
 from src.agents import get_chatbot_agent, get_ticket_agent
 from src.db import save_ticket, check_for_duplicate_ticket
+from src.constants import SUBMIT_WORDS, EDIT_WORDS, CANCEL_WORDS
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -185,14 +186,15 @@ def ticket_confirmation_node(state: AgentState):
         messages = state["messages"]
         last_user_message = messages[-1].content.lower().strip()
         
-        if any(word in last_user_message for word in ["submit", "yes", "confirm", "ok", "proceed", "create"]):
+        # Use centralized constants for consistency
+        if any(word in last_user_message for word in SUBMIT_WORDS):
             return {
                 "messages": [AIMessage(content="Creating your ticket...")],
                 "confirmation_action": "submit",
                 "awaiting_confirmation": False
             }
         
-        elif any(word in last_user_message for word in ["edit", "change", "modify", "update"]):
+        elif any(word in last_user_message for word in EDIT_WORDS):
             return {
                 "messages": [AIMessage(content="What would you like to change? (e.g., 'change priority to ...' or 'change device to ...')")],
                 "confirmation_action": "",  # Clear action so we don't loop
@@ -200,7 +202,7 @@ def ticket_confirmation_node(state: AgentState):
                 "awaiting_confirmation": False  # Not awaiting submit/edit/cancel anymore
             }
         
-        elif any(word in last_user_message for word in ["cancel", "no", "nevermind", "back", "stop"]):
+        elif any(word in last_user_message for word in CANCEL_WORDS):
             return {
                 "messages": [AIMessage(content="Ticket cancelled. How else can I help you?")],
                 "confirmation_action": "cancel",

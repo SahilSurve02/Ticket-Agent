@@ -19,6 +19,13 @@ from src.state import (
     ExtractedTicketFields, ChatbotResponseAction
 )
 from src.kb import get_global_kb, get_best_solution, detect_category
+from src.prompts import PromptBuilder
+from src.validators import ExtractionValidator, validate_extraction_result
+from src.constants import (
+    VALID_CATEGORIES, VALID_PRIORITIES, 
+    AFFIRMATIVE_WORDS, NEGATIVE_WORDS,
+    FIELD_CONFIDENCE_THRESHOLDS, DEFAULT_CONFIDENCE_THRESHOLD
+)
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -101,8 +108,8 @@ Feel free to ask me anything else!"""
             if awaiting_ticket_confirmation:
                 response_lower = user_message.lower().strip()
                 
-                # User confirms ticket creation
-                if any(word in response_lower for word in ["yes", "yeah", "yep", "sure", "ok", "okay", "please", "yup", "create", "go ahead", "do it", "confirm", "proceed", "sure"]):
+                # User confirms ticket creation - use centralized constants
+                if any(word in response_lower for word in AFFIRMATIVE_WORDS):
                     msg = "I'll transfer you to our Ticket Agent to create a support ticket."
                     logger.info("User confirmed ticket creation, handing off to TicketAgent")
                     
@@ -151,8 +158,8 @@ Feel free to ask me anything else!"""
                         "ticket": ticket_obj
                     }
                 
-                # User declines ticket creation
-                elif any(word in response_lower for word in ["no", "nope", "nah", "cancel", "nevermind", "never mind", "don't", "do not", "stop", "not now", "later", "skip"]):
+                # User declines ticket creation - use centralized constants
+                elif any(word in response_lower for word in NEGATIVE_WORDS):
                     msg = "No problem! Is there anything else I can help you with?"
                     logger.info("User declined ticket creation, staying in chatbot mode")
                     return {
@@ -238,47 +245,15 @@ Is there any IT support I can help you with?"""
                     "awaiting_ticket_confirmation": True
                 }
             
-            # Build system prompt
+            # Build system prompt using centralized PromptBuilder
             if kb_results["found"] and kb_results["confidence"] in ["high", "medium"]:
                 kb_context = "\n\n".join([
                     f"**Solution** (Relevance: {sol['similarity']:.0%}):\n{sol['content']}"
                     for sol in kb_results["solutions"][:2]
                 ])
-                
-                system_prompt = f"""You are a friendly IT Support Chatbot Agent.
-
-KNOWLEDGE BASE SOLUTIONS (for reference only):
-{kb_context}
-
-CRITICAL RULES:
-1. For GREETINGS (hi, hello, hey, etc.): Respond warmly like "Hello! How can I assist you today?" - DO NOT ask about specific issues
-2. For VAGUE IT queries (e.g., "laptop issue", "need help", "having problems"):
-   - ASK a clarifying question like: "I'd be happy to help! Could you describe what specific issue you're experiencing?"
-3. For SPECIFIC IT queries: Provide troubleshooting steps from the knowledge base
-
-EXAMPLES:
-- "Hi" / "Hello" → "Hello! How can I assist you today?"
-- "My laptop has issues" → Ask for clarification
-- "My laptop is running very slow" → Provide solutions
-
-Keep responses SHORT and helpful.
-DO NOT mention tickets or escalation - I handle that separately.
-"""
+                system_prompt = PromptBuilder.build_chatbot_system_prompt(kb_context=kb_context)
             else:
-                system_prompt = """You are a friendly IT Support Chatbot Agent.
-
-YOUR ROLE:
-1. For GREETINGS (hi, hello, hey, etc.): Respond warmly like "Hello! How can I assist you today?"
-2. For IT-related queries: Ask clarifying questions to understand the issue
-3. Be conversational and empathetic
-
-EXAMPLES:
-- "Hi" / "Hello" → "Hello! How can I assist you today?"
-- "I need help" → "Of course! What issue are you experiencing?"
-
-Keep responses SHORT and helpful.
-DO NOT mention tickets or escalation - I handle that separately.
-"""
+                system_prompt = PromptBuilder.build_chatbot_system_prompt(kb_context=None)
             
             response = self.llm.invoke([SystemMessage(content=system_prompt)] + messages)
             
@@ -385,39 +360,13 @@ When in doubt, respond "YES"."""
             # Build extraction LLM with structured output
             extraction_llm = self.llm.with_structured_output(ExtractedTicketFields)
             
-            devices_context = ", ".join(user_devices) if user_devices else "Not specified"
-            
-            extraction_prompt = f"""You are an expert IT support analyst. Extract ticket fields from the conversation.
-
-AVAILABLE USER DEVICES: {devices_context}
-
-EXTRACTION RULES STRICT RULES (DO NOT HALLUCINATE)::
-1. **Category** - Infer from the issue type:
-   - Network: WiFi, internet, VPN, connectivity issues
-   - Account: Login, password, MFA, access issues
-   - Hardware: Physical device problems, display, keyboard, battery, machine is dead, box is toast
-   - Software: Application crashes, errors, installations
-   - Email: Outlook, email sending/receiving issues
-   - General: Other IT issues
-
-2. **Priority** - Infer from urgency/impact (semantic understanding):
-   - Critical: system down, cannot work at all, emergency, completely broken, dead, toast
-   - High: urgent, blocking work, need this ASAP, cannot do my job
-   - Medium: affecting work, annoying, need help when possible
-   - Low: can wait, minor issue, when you get a chance
-
-3. **Device** - ONLY extract if user EXPLICITLY mentions a specific brand or model name:
-   - ONLY extract device_brand if user EXPLICITLY mentions a brand name like Dell, HP, Apple, MacBook, Lenovo
-   - ONLY extract device_type if user mentions it (laptop, desktop, phone, printer)
-   - DO NOT extract device_brand for generic terms like "my laptop", "computer", "machine"
-   - If user says "my laptop" or similar without a brand, set device_brand=None, device_type="laptop"
-   - NEVER guess or infer a brand that is not explicitly stated in the text
-
-
-CONVERSATION:
-{conversation_text}
-
-CRITICAL: Only extract device_brand if the user EXPLICITLY mentions a brand name. Do not infer or guess."""
+            # Use centralized prompt builder
+            devices_context = PromptBuilder.format_devices_list(user_devices)
+            extraction_prompt = PromptBuilder.build_extraction_prompt(
+                devices_context=devices_context,
+                text_content=conversation_text,
+                include_category=True
+            )
             
             result = extraction_llm.invoke([
                 SystemMessage(content=extraction_prompt)
@@ -425,39 +374,41 @@ CRITICAL: Only extract device_brand if the user EXPLICITLY mentions a brand name
             
             extracted = {}
             
-            # Map priority
+            # Map and validate priority using centralized validator
             if result.priority:
-                extracted["priority"] = result.priority
+                validated_priority = ExtractionValidator.validate_priority(result.priority)
+                if validated_priority:
+                    extracted["priority"] = validated_priority
+                else:
+                    logger.warning(f"[ChatbotAgent] Invalid priority discarded: {result.priority}")
             
-            # Map category
+            # Map and validate category using centralized validator
             if result.category:
-                extracted["category"] = result.category
+                validated_category = ExtractionValidator.validate_category(result.category)
+                if validated_category:
+                    extracted["category"] = validated_category
+                else:
+                    logger.warning(f"[ChatbotAgent] Invalid category discarded: {result.category}")
             
             # Match device using LLM intelligence (avoids buggy string matching)
             # ONLY match if user explicitly mentioned a brand (avoid ambiguous guessing)
             if user_devices and result.device_brand:
-                # Let LLM match the mentioned device to registered devices
-                device_match_prompt = f"""Match the user's device mention to their registered devices.
-
-User mentioned: {result.device_brand or ''} {result.device_type or ''}
-
-Registered devices:
-{chr(10).join(f'- {d}' for d in user_devices)}
-
-Return the EXACT registered device name that best matches the user's mention.
-If no good match exists, return 'None'.
-Return ONLY the device name, nothing else."""
+                # Use centralized device matching prompt
+                device_match_prompt = PromptBuilder.build_device_match_prompt(
+                    device_brand=result.device_brand or '',
+                    device_type=result.device_type or '',
+                    user_devices=user_devices
+                )
                 
                 try:
                     match_result = self.llm.invoke([SystemMessage(content=device_match_prompt)])
                     matched_device = match_result.content.strip()
                     
-                    # Validate LLM returned an actual device from the list
-                    if matched_device in user_devices:
-                        extracted["device_id"] = matched_device
-                        logger.info(f"[ChatbotAgent] LLM matched device: '{matched_device}'")
-                    else:
-                        logger.warning(f"[ChatbotAgent] LLM returned invalid device: '{matched_device}'")
+                    # Validate using centralized validator
+                    validated_device = ExtractionValidator.validate_device(matched_device, user_devices)
+                    if validated_device:
+                        extracted["device_id"] = validated_device
+                        logger.info(f"[ChatbotAgent] LLM matched device: '{validated_device}'")
                 except Exception as e:
                     logger.warning(f"[ChatbotAgent] Device matching error: {e}")
             
@@ -760,9 +711,8 @@ Return the updated fields only.
         
         # Issue summary - extract from user's original issue description
         if not ticket.issue_summary:
-            summary_prompt = """Extract brief issue summary (5-10 words) from conversation.
-Use TicketSchema tool to update ONLY issue_summary.
-Critical: Do not mention device names or user info in the summary."""
+            # Use centralized prompt builder for consistency
+            summary_prompt = PromptBuilder.build_issue_summary_prompt()
             response = self.llm_with_tools.invoke([SystemMessage(content=summary_prompt)] + messages)
             if response.tool_calls:
                 new_data = response.tool_calls[0]['args']
@@ -826,71 +776,47 @@ Critical: Do not mention device names or user info in the summary."""
         try:
             extraction_llm = self.llm.with_structured_output(ExtractedTicketFields)
             logger.debug(f"Issue text for extraction: {issue_text}")
-            devices_context = ", ".join(user_devices) if user_devices else "None available"
-            logger.debug(f"[TicketAgent] User devices for extraction context: {devices_context}")
             
-            extraction_prompt = f"""You are an expert IT support analyst. Extract ticket fields semantically from the user's issue description.
-
-AVAILABLE USER DEVICES: {devices_context}
-
-SEMANTIC EXTRACTION RULES:
-
-1. **Priority** - Understand the MEANING, not just keywords:
-   - Critical: Complete inability to work, system failures
-     Examples: system down, cannot do anything, completely broken, dead, toast, everything is on fire
-   - High: Significant work impact, urgent need
-     Examples: urgent, blocking me, need ASAP, cannot continue, stuck
-   - Medium: Work affected but can function, needs attention
-     Examples: annoying, affecting productivity, need help, frustrating
-   - Low: Minor issues, can wait
-     Examples: when you can, not urgent, minor, small thing
-
-2. **Device** - STRICT RULES (DO NOT HALLUCINATE):
-   - ONLY extract device_brand if user EXPLICITLY mentions a brand name like Dell, HP, Apple, MacBook, Lenovo
-   - ONLY extract device_type if user mentions it (laptop, desktop, phone, printer)
-   - DO NOT extract device_brand for generic terms like "my laptop", "computer", "machine"
-   - If user says "my laptop" or similar without a brand, set device_brand=None, device_type="laptop"
-   - NEVER guess or infer a brand that is not explicitly stated in the text
-
-USER'S ISSUE DESCRIPTION:
-{issue_text}
-
-CRITICAL: Only extract device_brand if EXPLICITLY mentioned. Generic terms like 'laptop' should NOT result in a brand extraction.Do not assume device always matches it with {devices_context}."""
+            # Use centralized prompt builder (no category - already detected)
+            devices_context = PromptBuilder.format_devices_list(user_devices)
+            extraction_prompt = PromptBuilder.build_extraction_prompt(
+                devices_context=devices_context,
+                text_content=issue_text,
+                include_category=False  # Category already detected by ChatbotAgent
+            )
             
             result = extraction_llm.invoke([SystemMessage(content=extraction_prompt)])
             
             extracted = {}
-            # print(f"Result from LLM extraction: {result}")
-            # Map priority directly from LLM output
-            if result.priority and result.confidence >= 0.5:
-                extracted["priority"] = result.priority
             
-            # Match device using LLM intelligence (avoids buggy string matching)
-            # ONLY match if user explicitly mentioned a brand (avoid ambiguous guessing)
+            # Map and validate priority using centralized validator
+            confidence_threshold = FIELD_CONFIDENCE_THRESHOLDS.get("priority", DEFAULT_CONFIDENCE_THRESHOLD)
+            if result.priority and result.confidence >= confidence_threshold:
+                validated_priority = ExtractionValidator.validate_priority(result.priority)
+                if validated_priority:
+                    extracted["priority"] = validated_priority
+                else:
+                    logger.warning(f"[TicketAgent] Invalid priority discarded: {result.priority}")
+            
+            # Match device using centralized prompt and validator
             if user_devices and result.device_brand:
                 logger.info(f"[TicketAgent] LLM extracted device_brand: {result.device_brand}, device_type: {result.device_type}")
-                # Let LLM match the mentioned device to registered devices
-                device_match_prompt = f"""Match the user's device mention to their registered devices.
-
-User mentioned: {result.device_brand or ''} {result.device_type or ''}
-
-Registered devices:
-{chr(10).join(f'- {d}' for d in user_devices)}
-
-Return the EXACT registered device name that best matches the user's mention.
-If no good match exists, return 'None'.
-Return ONLY the device name, nothing else."""
+                
+                device_match_prompt = PromptBuilder.build_device_match_prompt(
+                    device_brand=result.device_brand or '',
+                    device_type=result.device_type or '',
+                    user_devices=user_devices
+                )
                 
                 try:
                     match_result = self.llm.invoke([SystemMessage(content=device_match_prompt)])
                     matched_device = match_result.content.strip()
                     
-                    # Validate LLM returned an actual device from the list
-                    if matched_device in user_devices:
-                        extracted["device_id"] = matched_device
-                        logger.info(f"[TicketAgent] LLM matched device: '{matched_device}'")
-                    else:
-                        logger.warning(f"[TicketAgent] LLM returned invalid device: '{matched_device}'")
+                    # Validate using centralized validator
+                    validated_device = ExtractionValidator.validate_device(matched_device, user_devices)
+                    if validated_device:
+                        extracted["device_id"] = validated_device
+                        logger.info(f"[TicketAgent] LLM matched device: '{validated_device}'")
                 except Exception as e:
                     logger.warning(f"[TicketAgent] Device matching error: {e}")
             
